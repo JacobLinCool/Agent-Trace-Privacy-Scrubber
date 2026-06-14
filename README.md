@@ -65,6 +65,8 @@ modal deploy modal_app.py
 
 Then select **Modal cloud GPU** in the app settings. Modal currently supports `OpenMed/privacy-filter-nemotron` in this project. Use the current-runtime backend for Apple MLX models.
 
+The Advanced **Model batch size** control defaults to 32. For Modal, this batches JSONL rows and string values before each remote call, and the Modal worker forwards that batch size into OpenMed's privacy-filter pipeline.
+
 ## Common Trace Locations
 
 - Codex sessions: `~/.codex/sessions`

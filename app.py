@@ -163,6 +163,7 @@ def process_selected_logs(
     preserve_json_structure: bool,
     include_report: bool,
     chunk_size: int,
+    model_batch_size: int,
     max_file_size_warning_mb: int,
     confidence_threshold: float,
     seed: int,
@@ -180,6 +181,7 @@ def process_selected_logs(
             preserve_json_structure,
             include_report,
             chunk_size,
+            model_batch_size,
             max_file_size_warning_mb,
             confidence_threshold,
             seed,
@@ -197,6 +199,7 @@ def process_selected_logs(
         preserve_json_structure,
         include_report,
         chunk_size,
+        model_batch_size,
         max_file_size_warning_mb,
         confidence_threshold,
         seed,
@@ -215,6 +218,7 @@ def _process_selected_logs_current_runtime(
     preserve_json_structure: bool,
     include_report: bool,
     chunk_size: int,
+    model_batch_size: int,
     max_file_size_warning_mb: int,
     confidence_threshold: float,
     seed: int,
@@ -231,6 +235,7 @@ def _process_selected_logs_current_runtime(
         preserve_json_structure,
         include_report,
         chunk_size,
+        model_batch_size,
         max_file_size_warning_mb,
         confidence_threshold,
         seed,
@@ -249,6 +254,7 @@ def _process_selected_logs_impl(
     preserve_json_structure: bool,
     include_report: bool,
     chunk_size: int,
+    model_batch_size: int,
     max_file_size_warning_mb: int,
     confidence_threshold: float,
     seed: int,
@@ -288,13 +294,14 @@ def _process_selected_logs_impl(
         preserve_json_structure=preserve_json_structure,
         include_report=include_report,
         chunk_size=int(chunk_size),
+        model_batch_size=int(model_batch_size),
         confidence_threshold=float(confidence_threshold),
         seed=int(seed),
     )
 
     workspace = make_output_workspace()
     sanitized_root = workspace / "sanitized"
-    model_redactor = _build_model_redactor(compute_backend)
+    model_redactor = _build_model_redactor(compute_backend, int(model_batch_size))
     file_reports: list[FileProcessReport] = []
     total_lines = sum(int(log.get("line_count") or 0) for log in selected_logs)
     total_bytes = sum(int(log.get("size_bytes") or 0) for log in selected_logs)
@@ -420,9 +427,9 @@ def _process_selected_logs_impl(
     )
 
 
-def _build_model_redactor(compute_backend: str) -> PIIRedactor:
+def _build_model_redactor(compute_backend: str, model_batch_size: int) -> PIIRedactor:
     if compute_backend == MODAL_CLOUD_BACKEND:
-        return ModalPIIRedactor()
+        return ModalPIIRedactor(batch_size=model_batch_size)
     return OpenMedPIIRedactor()
 
 
@@ -541,6 +548,7 @@ def build_app() -> gr.Blocks:
                 include_report = gr.Checkbox(True, label="Include detailed redaction report")
             with gr.Accordion("Advanced", open=False):
                 chunk_size = gr.Slider(1000, 20000, value=6000, step=500, label="Chunk size")
+                model_batch_size = gr.Slider(1, 128, value=32, step=1, label="Model batch size")
                 max_file_size_warning_mb = gr.Slider(1, 500, value=50, step=1, label="Max file size warning threshold (MB)")
                 confidence_threshold = gr.Slider(0.0, 1.0, value=0.5, step=0.05, label="OpenMed confidence threshold")
                 seed = gr.Number(value=2026, precision=0, label="Seed for deterministic replacement/hash")
@@ -614,6 +622,7 @@ def build_app() -> gr.Blocks:
                 preserve_json_structure,
                 include_report,
                 chunk_size,
+                model_batch_size,
                 max_file_size_warning_mb,
                 confidence_threshold,
                 seed,

@@ -66,6 +66,7 @@ def redact_text_batch(texts: list[str], settings: dict[str, object]) -> list[dic
         preserve_json_structure=True,
         include_report=True,
         chunk_size=int(settings["chunk_size"]),
+        model_batch_size=int(settings["model_batch_size"]),
         confidence_threshold=float(settings["confidence_threshold"]),
         seed=int(settings["seed"]),
     )
@@ -74,8 +75,7 @@ def redact_text_batch(texts: list[str], settings: dict[str, object]) -> list[dic
 
     redactor = _get_redactor(OpenMedPIIRedactor, config)
     responses: list[dict[str, object]] = []
-    for text in texts:
-        result = redactor.redact(text, config)
+    for result in redactor.redact_many(texts, config):
         responses.append(
             {
                 "text": result.text,

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from trace_scrubber.jsonl_processor import process_jsonl_file
 from trace_scrubber.jsonl_processor import process_jsonl_file_iter
-from trace_scrubber.redactors import RedactionConfig
+from trace_scrubber.redactors import RedactionConfig, TextRedactionResult
 
 
 def test_invalid_jsonl_line_is_sanitized_as_raw_text(tmp_path: Path) -> None:
@@ -67,3 +67,48 @@ def test_progress_debounce_still_emits_final_line(tmp_path: Path) -> None:
     progress_lines = [event.progress.line_number for event in events if event.progress is not None]
 
     assert progress_lines == [1, 3]
+
+
+def test_model_redaction_batches_across_jsonl_lines(tmp_path: Path) -> None:
+    class FakeBatchRedactor:
+        batch_size = 8
+
+        def prepare_model(self, config: RedactionConfig) -> None:
+            pass
+
+        def redact(self, text: str, config: RedactionConfig) -> TextRedactionResult:
+            return self.redact_many([text], config)[0]
+
+        def redact_many(self, texts: list[str], config: RedactionConfig) -> list[TextRedactionResult]:
+            calls.append(texts)
+            return [TextRedactionResult(text=f"<PII:{index}>") for index, _ in enumerate(texts)]
+
+        def release(self) -> None:
+            pass
+
+    calls: list[list[str]] = []
+    input_file = tmp_path / "trace.jsonl"
+    output_file = tmp_path / "out" / "trace.jsonl"
+    input_file.write_text(
+        '{"content":"alice@example.com"}\n'
+        '{"content":"bob@example.com"}\n'
+        '{"nested":["carol@example.com"]}\n',
+        encoding="utf-8",
+    )
+    config = RedactionConfig(regex_enabled=False, model_enabled=True)
+
+    process_jsonl_file(
+        input_file,
+        output_file,
+        "trace.jsonl",
+        config,
+        total_lines=3,
+        model_redactor=FakeBatchRedactor(),
+    )
+
+    assert calls == [["alice@example.com", "bob@example.com", "carol@example.com"]]
+    assert output_file.read_text(encoding="utf-8").splitlines() == [
+        '{"content":"<PII:0>"}',
+        '{"content":"<PII:1>"}',
+        '{"nested":["<PII:2>"]}',
+    ]

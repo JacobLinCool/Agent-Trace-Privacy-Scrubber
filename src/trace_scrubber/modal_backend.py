@@ -9,6 +9,7 @@ from .redactors import ModelRedactionError, RedactionConfig, TextRedactionResult
 
 MODAL_APP_NAME = "agent-trace-privacy-scrubber"
 MODAL_FUNCTION_NAME = "redact_text_batch"
+DEFAULT_MODAL_BATCH_SIZE = 32
 
 FunctionLookup = Callable[[str, str], Any]
 
@@ -21,10 +22,12 @@ class ModalPIIRedactor:
         *,
         app_name: str = MODAL_APP_NAME,
         function_name: str = MODAL_FUNCTION_NAME,
+        batch_size: int = DEFAULT_MODAL_BATCH_SIZE,
         function_lookup: FunctionLookup | None = None,
     ) -> None:
         self.app_name = app_name
         self.function_name = function_name
+        self.batch_size = max(1, int(batch_size))
         self._function_lookup = function_lookup
         self._function: Any | None = None
 
@@ -43,20 +46,25 @@ class ModalPIIRedactor:
             ) from exc
 
     def redact(self, text: str, config: RedactionConfig) -> TextRedactionResult:
-        if not text:
-            return TextRedactionResult(text=text)
+        return self.redact_many([text], config)[0]
 
+    def redact_many(self, texts: list[str], config: RedactionConfig) -> list[TextRedactionResult]:
+        if not texts:
+            return []
         self.prepare_model(config)
         assert self._function is not None
-        try:
-            payload = self._function.remote([text], _modal_settings(config))
-        except Exception as exc:
-            raise ModelRedactionError(
-                "Modal cloud redaction failed. Verify Modal credentials, deployment "
-                "status, and remote GPU availability."
-            ) from exc
 
-        return _coerce_modal_result(payload)
+        results: list[TextRedactionResult] = []
+        for batch in _batched(texts, self.batch_size):
+            try:
+                payload = self._function.remote(batch, _modal_settings(config))
+            except Exception as exc:
+                raise ModelRedactionError(
+                    "Modal cloud redaction failed. Verify Modal credentials, deployment "
+                    "status, and remote GPU availability."
+                ) from exc
+            results.extend(_coerce_modal_results(payload, expected_count=len(batch)))
+        return results
 
     def release(self) -> None:
         """No local model resources are held by the Modal client."""
@@ -81,24 +89,34 @@ def _modal_settings(config: RedactionConfig) -> dict[str, object]:
         "model_name": config.model_name,
         "mode": config.mode,
         "chunk_size": int(config.chunk_size),
+        "model_batch_size": int(config.model_batch_size),
         "confidence_threshold": float(config.confidence_threshold),
         "seed": int(config.seed),
     }
 
 
-def _coerce_modal_result(payload: object) -> TextRedactionResult:
-    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+def _coerce_modal_results(payload: object, *, expected_count: int) -> list[TextRedactionResult]:
+    if not isinstance(payload, list) or len(payload) != expected_count:
         raise ModelRedactionError("Modal cloud redaction returned an invalid response.")
 
-    item = payload[0]
-    text = item.get("text")
-    if not isinstance(text, str):
-        raise ModelRedactionError("Modal cloud redaction returned a response without text.")
+    results: list[TextRedactionResult] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            raise ModelRedactionError("Modal cloud redaction returned an invalid response item.")
+        text = item.get("text")
+        if not isinstance(text, str):
+            raise ModelRedactionError("Modal cloud redaction returned a response without text.")
+        results.append(
+            TextRedactionResult(
+                text=text,
+                pii_counts=Counter(_coerce_count_mapping(item.get("pii_counts", {}))),
+            )
+        )
+    return results
 
-    return TextRedactionResult(
-        text=text,
-        pii_counts=Counter(_coerce_count_mapping(item.get("pii_counts", {}))),
-    )
+
+def _coerce_modal_result(payload: object) -> TextRedactionResult:
+    return _coerce_modal_results(payload, expected_count=1)[0]
 
 
 def _coerce_count_mapping(value: object) -> dict[str, int]:
@@ -114,3 +132,7 @@ def _coerce_count_mapping(value: object) -> dict[str, int]:
         if normalized_count > 0:
             counts[str(key)] = normalized_count
     return counts
+
+
+def _batched(items: list[str], batch_size: int) -> list[list[str]]:
+    return [items[index : index + batch_size] for index in range(0, len(items), batch_size)]

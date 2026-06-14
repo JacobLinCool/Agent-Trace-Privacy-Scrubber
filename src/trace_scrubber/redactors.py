@@ -27,6 +27,7 @@ class RedactionConfig:
     preserve_json_structure: bool = True
     include_report: bool = True
     chunk_size: int = 6000
+    model_batch_size: int = 32
     confidence_threshold: float = 0.5
     seed: int = 2026
 
@@ -49,6 +50,10 @@ class PIIRedactor(Protocol):
         """Redact PII spans from one text value."""
         ...
 
+    def redact_many(self, texts: list[str], config: RedactionConfig) -> list[TextRedactionResult]:
+        """Redact PII spans from multiple text values in one model batch."""
+        ...
+
     def release(self) -> None:
         """Release local resources held by the redactor."""
         ...
@@ -67,6 +72,13 @@ class EntitySpan:
     start: int
     end: int
     confidence: float
+
+
+@dataclass(frozen=True)
+class _ChunkRef:
+    text_index: int
+    text: str
+    offset: int
 
 
 SECRET_RULES: tuple[SecretRule, ...] = (
@@ -257,14 +269,33 @@ class OpenMedPIIRedactor:
         self._clear_torch_cache()
 
     def redact(self, text: str, config: RedactionConfig) -> TextRedactionResult:
-        if not text:
-            return TextRedactionResult(text=text)
+        return self.redact_many([text], config)[0]
+
+    def redact_many(self, texts: list[str], config: RedactionConfig) -> list[TextRedactionResult]:
+        if not texts:
+            return []
+
+        results = [TextRedactionResult(text=text) for text in texts]
+        populated_indexes = [index for index, text in enumerate(texts) if text]
+        if not populated_indexes:
+            return results
+
         self.ensure_available()
 
-        spans = self._extract_spans(text, config)
+        populated_texts = [texts[index] for index in populated_indexes]
+        spans_by_text = self._extract_spans_many(populated_texts, config)
+        for result_index, spans in zip(populated_indexes, spans_by_text):
+            results[result_index] = self._redact_with_spans(texts[result_index], spans, config)
+        return results
+
+    def _redact_with_spans(
+        self,
+        text: str,
+        spans: list[EntitySpan],
+        config: RedactionConfig,
+    ) -> TextRedactionResult:
         if not spans:
             return TextRedactionResult(text=text)
-
         counts: Counter[str] = Counter(span.label for span in spans)
         redacted = text
         for span in sorted(spans, key=lambda item: item.start, reverse=True):
@@ -274,21 +305,35 @@ class OpenMedPIIRedactor:
         return TextRedactionResult(text=redacted, pii_counts=counts)
 
     def _extract_spans(self, text: str, config: RedactionConfig) -> list[EntitySpan]:
-        chunk_size = max(1000, int(config.chunk_size))
-        if len(text) <= chunk_size:
-            return self._extract_chunk_spans(text, 0, config)
+        return self._extract_spans_many([text], config)[0]
 
-        overlap = min(256, max(32, chunk_size // 20))
-        all_spans: list[EntitySpan] = []
-        start = 0
-        while start < len(text):
-            end = _chunk_boundary(text, start, chunk_size)
-            chunk = text[start:end]
-            all_spans.extend(self._extract_chunk_spans(chunk, start, config))
-            if end >= len(text):
-                break
-            start = max(end - overlap, start + 1)
-        return _dedupe_overlapping_spans(all_spans)
+    def _extract_spans_many(self, texts: list[str], config: RedactionConfig) -> list[list[EntitySpan]]:
+        chunk_size = max(1000, int(config.chunk_size))
+        chunk_refs: list[_ChunkRef] = []
+        for text_index, text in enumerate(texts):
+            if len(text) <= chunk_size:
+                chunk_refs.append(_ChunkRef(text_index=text_index, text=text, offset=0))
+                continue
+
+            overlap = min(256, max(32, chunk_size // 20))
+            start = 0
+            while start < len(text):
+                end = _chunk_boundary(text, start, chunk_size)
+                chunk_refs.append(_ChunkRef(text_index=text_index, text=text[start:end], offset=start))
+                if end >= len(text):
+                    break
+                start = max(end - overlap, start + 1)
+
+        if not chunk_refs:
+            return [[] for _ in texts]
+
+        results = self._extract_chunk_results(chunk_refs, config)
+        spans_by_text: list[list[EntitySpan]] = [[] for _ in texts]
+        for chunk_ref, result in zip(chunk_refs, results):
+            spans_by_text[chunk_ref.text_index].extend(
+                self._entity_spans_from_result(result, chunk_ref.text, chunk_ref.offset, config)
+            )
+        return [_dedupe_overlapping_spans(spans) for spans in spans_by_text]
 
     def _extract_chunk_spans(
         self,
@@ -296,29 +341,52 @@ class OpenMedPIIRedactor:
         offset: int,
         config: RedactionConfig,
     ) -> list[EntitySpan]:
+        return self._entity_spans_from_result(
+            self._extract_chunk_results([_ChunkRef(text_index=0, text=chunk, offset=offset)], config)[0],
+            chunk,
+            offset,
+            config,
+        )
+
+    def _extract_chunk_results(self, chunk_refs: list[_ChunkRef], config: RedactionConfig) -> list[Any]:
         assert self._extract_pii is not None
         try:
             if self._uses_privacy_filter_model(config.model_name):
                 assert self._extract_pii_batch is not None
-                result = self._extract_pii_batch(
-                    [chunk],
+                results = self._extract_pii_batch(
+                    [chunk_ref.text for chunk_ref in chunk_refs],
                     model_name=config.model_name,
                     confidence_threshold=config.confidence_threshold,
                     privacy_filter_pipeline=self._get_privacy_filter_pipeline(config.model_name),
-                )[0]
-            else:
-                result = self._extract_pii(
-                    chunk,
-                    model_name=config.model_name,
-                    confidence_threshold=config.confidence_threshold,
+                    batch_size=max(1, int(config.model_batch_size)),
                 )
+            else:
+                results = [
+                    self._extract_pii(
+                        chunk_ref.text,
+                        model_name=config.model_name,
+                        confidence_threshold=config.confidence_threshold,
+                    )
+                    for chunk_ref in chunk_refs
+                ]
         except Exception as exc:  # pragma: no cover - depends on model runtime
             raise ModelRedactionError(
                 "Local OpenMed model redaction failed. Verify the selected model, "
                 "install extras with `openmed[hf]` or `openmed[mlx]`, and ensure the "
                 "machine has enough memory for the model."
             ) from exc
+        normalized_results = list(results)
+        if len(normalized_results) != len(chunk_refs):
+            raise ModelRedactionError("OpenMed returned an unexpected batch length.")
+        return normalized_results
 
+    def _entity_spans_from_result(
+        self,
+        result: Any,
+        chunk: str,
+        offset: int,
+        config: RedactionConfig,
+    ) -> list[EntitySpan]:
         spans: list[EntitySpan] = []
         for entity in getattr(result, "entities", []):
             try:
@@ -469,27 +537,44 @@ def sanitize_text(
 ) -> TextRedactionResult:
     """Run configured redaction passes over one text string."""
 
-    regex_counts: Counter[str] = Counter()
-    pii_counts: Counter[str] = Counter()
-    redacted = text
+    return sanitize_texts([text], config, model_redactor=model_redactor)[0]
+
+
+def sanitize_texts(
+    texts: Iterable[str],
+    config: RedactionConfig,
+    model_redactor: PIIRedactor | None = None,
+) -> list[TextRedactionResult]:
+    """Run configured redaction passes over multiple text strings."""
+
+    results = [TextRedactionResult(text=text) for text in texts]
+    if not results:
+        return []
 
     if config.regex_enabled:
-        regex_result = SecretRegexRedactor(seed=config.seed).redact(redacted, config.mode)
-        redacted = regex_result.text
-        regex_counts.update(regex_result.regex_counts)
+        regex_redactor = SecretRegexRedactor(seed=config.seed)
+        for result in results:
+            regex_result = regex_redactor.redact(result.text, config.mode)
+            result.text = regex_result.text
+            result.regex_counts.update(regex_result.regex_counts)
 
     if config.model_enabled:
         model = model_redactor or OpenMedPIIRedactor()
-        pii_result = model.redact(redacted, config)
-        redacted = pii_result.text
-        pii_counts.update(pii_result.pii_counts)
+        pii_results = model.redact_many([result.text for result in results], config)
+        if len(pii_results) != len(results):
+            raise ModelRedactionError("Model redaction returned an unexpected batch length.")
+        for result, pii_result in zip(results, pii_results):
+            result.text = pii_result.text
+            result.pii_counts.update(pii_result.pii_counts)
 
     if config.regex_enabled:
-        regex_result = SecretRegexRedactor(seed=config.seed).redact(redacted, config.mode)
-        redacted = regex_result.text
-        regex_counts.update(regex_result.regex_counts)
+        regex_redactor = SecretRegexRedactor(seed=config.seed)
+        for result in results:
+            regex_result = regex_redactor.redact(result.text, config.mode)
+            result.text = regex_result.text
+            result.regex_counts.update(regex_result.regex_counts)
 
-    return TextRedactionResult(text=redacted, regex_counts=regex_counts, pii_counts=pii_counts)
+    return results
 
 
 def merge_text_results(results: Iterable[TextRedactionResult]) -> TextRedactionResult:
