@@ -1,0 +1,4 @@
+{"agent":"codex","role":"user","content":"FAKE SAMPLE: Please inspect /Users/alice/dev/private-repo and email alice.fake@example.com when done. Test key: sk-proj-FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE."}
+{"agent":"codex","role":"tool_call","tool":"shell","input":{"cmd":"cat /Users/alice/dev/private-repo/.env","cwd":"/Users/alice/dev/private-repo"}}
+{"agent":"codex","role":"tool_result","content":"FAKE SAMPLE OUTPUT ONLY\nPASSWORD=fake-password-123\nHF_TOKEN=hf_FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE\nAuthorization: Bearer fakebearertokenfakebearertoken"}
+{"agent":"codex","role":"assistant","content":"I found the issue in the sample trace. No real secrets are present in this sample file."}

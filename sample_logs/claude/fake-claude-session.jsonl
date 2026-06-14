@@ -1,0 +1,4 @@
+{"agent":"claude-code","type":"user","message":"FAKE SAMPLE: Deploy with GitHub token ghp_FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE and Slack token xoxb-FAKEFAKEFAKE-FAKEFAKEFAKE-FAKEFAKEFAKE."}
+{"agent":"claude-code","type":"tool_use","name":"Bash","input":{"command":"curl 'https://example.invalid/api?token=fake-query-token-1234567890'","cwd":"/home/fake/project"}}
+{"agent":"claude-code","type":"tool_result","content":"FAKE SAMPLE ONLY: AWS_ACCESS_KEY_ID=AKIAFAKEFAKEFAKE1234 AWS_SECRET_ACCESS_KEY=fakeAwsSecretValue1234567890"}
+{"agent":"claude-code","type":"assistant","message":"The sample command completed. Review sanitized output before publishing real traces."}

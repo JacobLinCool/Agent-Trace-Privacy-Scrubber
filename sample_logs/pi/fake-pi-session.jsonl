@@ -1,0 +1,3 @@
+{"agent":"pi-agent","event":"prompt","text":"FAKE SAMPLE: contact pi.user@example.com and use Anthropic test key sk-ant-FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE."}
+{"agent":"pi-agent","event":"tool","input":"ssh key fixture follows: -----BEGIN OPENSSH PRIVATE KEY-----\nFAKEFAKEFAKEFAKEFAKEFAKEFAKE\n-----END OPENSSH PRIVATE KEY-----"}
+{"agent":"pi-agent","event":"result","text":"Basic auth sample: https://fake-user:fake-pass@example.invalid/path and JWT eyJmYWtlZmFrZWZha2U.eyJmYWtlZmFrZWZha2U.eyJmYWtlZmFrZWZha2U"}
