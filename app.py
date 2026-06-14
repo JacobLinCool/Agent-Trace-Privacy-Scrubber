@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import sys
 import time
 from collections import Counter
@@ -84,6 +85,300 @@ SOURCE_OPTIONS = [
     "Use sample logs",
 ]
 
+APP_CSS = """
+:root {
+  --ats-bg: #f6f7f8;
+  --ats-panel: #ffffff;
+  --ats-panel-soft: #f9fafb;
+  --ats-border: #d9dee4;
+  --ats-border-strong: #b9c2cd;
+  --ats-text: #111827;
+  --ats-muted: #5b6472;
+  --ats-subtle: #7a8493;
+  --ats-accent: #0f766e;
+  --ats-accent-strong: #115e59;
+  --ats-warn: #a16207;
+  --ats-error: #b91c1c;
+  --ats-success: #047857;
+  --ats-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
+}
+
+.gradio-container {
+  background: var(--ats-bg) !important;
+  color: var(--ats-text) !important;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+.app-shell {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 18px 18px 10px;
+}
+
+.app-topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: end;
+  border-bottom: 1px solid var(--ats-border);
+  padding-bottom: 16px;
+}
+
+.eyebrow {
+  color: var(--ats-accent-strong);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.app-title {
+  margin: 4px 0 4px;
+  font-size: 30px;
+  line-height: 1.08;
+  letter-spacing: 0;
+  color: var(--ats-text);
+}
+
+.app-subtitle {
+  max-width: 780px;
+  margin: 0;
+  color: var(--ats-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.runtime-ledger {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(130px, 1fr));
+  gap: 8px;
+  min-width: 330px;
+}
+
+.ledger-cell {
+  border: 1px solid var(--ats-border);
+  background: var(--ats-panel);
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.ledger-cell span {
+  display: block;
+  color: var(--ats-subtle);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.ledger-cell strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--ats-text);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.flow-rail {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.flow-step {
+  border: 1px solid var(--ats-border);
+  background: var(--ats-panel-soft);
+  color: var(--ats-muted);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.flow-step span {
+  color: var(--ats-accent-strong);
+  margin-right: 6px;
+}
+
+.workbench-grid {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 10px 18px 24px;
+  gap: 16px !important;
+}
+
+.tool-panel {
+  border: 1px solid var(--ats-border) !important;
+  border-radius: 8px !important;
+  background: var(--ats-panel) !important;
+  box-shadow: var(--ats-shadow);
+  padding: 14px !important;
+}
+
+.tool-panel + .tool-panel {
+  margin-top: 12px !important;
+}
+
+.section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.section-heading h2 {
+  margin: 0;
+  color: var(--ats-text);
+  font-size: 15px;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.section-heading span {
+  color: var(--ats-subtle);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.status-panel,
+.run-status {
+  border: 1px solid var(--ats-border);
+  background: var(--ats-panel-soft);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.status-panel strong,
+.run-status strong {
+  color: var(--ats-text);
+}
+
+.status-panel p,
+.run-status p {
+  margin: 4px 0 0;
+  color: var(--ats-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.status-panel.success,
+.run-status.success { border-color: rgba(4, 120, 87, 0.35); }
+.status-panel.warning,
+.run-status.warning { border-color: rgba(161, 98, 7, 0.35); }
+.status-panel.error,
+.run-status.error { border-color: rgba(185, 28, 28, 0.35); }
+.run-status.active { border-color: rgba(15, 118, 110, 0.42); }
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.metric {
+  border: 1px solid var(--ats-border);
+  background: #fff;
+  border-radius: 7px;
+  padding: 8px 9px;
+}
+
+.metric span {
+  display: block;
+  color: var(--ats-subtle);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.run-status__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--ats-border-strong);
+  border-radius: 999px;
+  color: var(--ats-accent-strong);
+  background: #fff;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8edf2;
+  margin: 10px 0;
+}
+
+.progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--ats-accent);
+  border-radius: inherit;
+}
+
+.inline-warning {
+  margin-top: 10px;
+  border: 1px solid rgba(161, 98, 7, 0.35);
+  background: #fffbeb;
+  color: #713f12;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.compact-actions button {
+  min-height: 38px !important;
+}
+
+.primary-run button {
+  min-height: 46px !important;
+  font-weight: 750 !important;
+}
+
+.data-surface textarea,
+.data-surface input,
+.data-surface table {
+  font-size: 13px !important;
+}
+
+.footer-note {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 18px 22px;
+  color: var(--ats-subtle);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .app-topbar,
+  .flow-rail,
+  .runtime-ledger,
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .app-title {
+    font-size: 24px;
+  }
+}
+"""
+
 
 def scan_logs(
     source_mode: str,
@@ -99,7 +394,7 @@ def scan_logs(
             target = str(KNOWN_LOCAL_SOURCES[known_source])
         elif source_mode == "Custom local path":
             if not custom_path.strip():
-                return "Enter a local path before scanning.", [], []
+                return _status_panel_html("warning", "Path required", "Enter a local path before scanning."), [], []
             logs = discover_custom_path(custom_path, max_file_size_warning_mb)
             target = custom_path
         elif source_mode == "Upload files":
@@ -113,16 +408,31 @@ def scan_logs(
             logs = discover_roots([sample_root], max_file_size_warning_mb)
             target = str(sample_root)
     except Exception as exc:
-        return f"Scan failed: {_safe_error(exc)}", [], []
+        return _status_panel_html("error", "Scan failed", _safe_error(exc)), [], []
 
     if not logs:
-        return f"No JSONL/NDJSON/JSON trace files found in `{target}`.", [], []
+        return _status_panel_html(
+            "warning",
+            "No trace files found",
+            f"No JSONL, NDJSON, or JSON trace files were found in {_inline_code(target)}.",
+            detail_is_html=True,
+        ), [], []
 
     rows = rows_for_table(logs, selected=True)
     state = [log.to_dict() for log in logs]
     total_kb = sum(float(row[4]) for row in rows)
     return (
-        f"Found **{len(rows)}** log file(s) in `{target}` ({total_kb:.1f} KB total).",
+        _status_panel_html(
+            "success",
+            "Scan complete",
+            f"Found trace files in {_inline_code(target)}.",
+            detail_is_html=True,
+            metrics=[
+                ("Files", str(len(rows))),
+                ("Selected", str(len(rows))),
+                ("Total size", f"{total_kb:.1f} KB"),
+            ],
+        ),
         rows,
         state,
     )
@@ -262,7 +572,11 @@ def _process_selected_logs_impl(
 ):
     if not regex_enabled and not model_enabled:
         yield (
-            "Enable the deterministic regex sweep, model-based PII redaction, or both before processing.",
+            _status_panel_html(
+                "warning",
+                "No redaction pass enabled",
+                "Enable deterministic secret scanning, model PII redaction, or both.",
+            ),
             None,
             [],
             "",
@@ -273,13 +587,16 @@ def _process_selected_logs_impl(
     selected = selected_relative_paths(table_data)
     selected_logs = [log for log in logs if str(log.get("relative_path")) in selected]
     if not selected_logs:
-        yield "Select at least one log file before processing.", None, [], ""
+        yield _status_panel_html("warning", "No files selected", "Select at least one trace file before processing."), None, [], ""
         return
 
     if model_enabled and compute_backend == MODAL_CLOUD_BACKEND and model_name not in MODAL_MODEL_OPTIONS:
         yield (
-            "Modal cloud GPU currently supports `OpenMed/privacy-filter-nemotron` only. "
-            "Choose the current app runtime for Apple MLX models.",
+            _status_panel_html(
+                "warning",
+                "Unsupported Modal model",
+                "Modal cloud GPU currently supports OpenMed/privacy-filter-nemotron only. Choose current runtime for Apple MLX models.",
+            ),
             None,
             [],
             "",
@@ -311,7 +628,7 @@ def _process_selected_logs_impl(
 
     if model_enabled:
         yield (
-            _status_markdown(
+            _status_html(
                 phase=_loading_phase(compute_backend),
                 file_index=0,
                 file_total=len(selected_logs),
@@ -331,7 +648,7 @@ def _process_selected_logs_impl(
             model_redactor.prepare_model(config)
         except ModelRedactionError as exc:
             model_redactor.release()
-            yield f"Model redaction is unavailable: {exc}", None, [], ""
+            yield _status_panel_html("error", "Model unavailable", _safe_error(exc)), None, [], ""
             return
 
     processed_lines = 0
@@ -343,7 +660,9 @@ def _process_selected_logs_impl(
         file_size = int(log.get("size_bytes") or 0)
         large_warning = ""
         if file_size > max_file_size_warning_mb * 1024 * 1024:
-            large_warning = f"\n\nWarning: `{relative_path}` is larger than {max_file_size_warning_mb} MB."
+            large_warning = _inline_warning_html(
+                f"{relative_path} is larger than {max_file_size_warning_mb} MB."
+            )
 
         try:
             for event in process_jsonl_file_iter(
@@ -362,7 +681,7 @@ def _process_selected_logs_impl(
                     regex_counts = aggregate_regex + event.progress.counts_by_regex_secret_rule
                     pii_counts = aggregate_pii + event.progress.counts_by_pii_label
                     yield (
-                        _status_markdown(
+                        _status_html(
                             phase="Processing",
                             file_index=file_index,
                             file_total=len(selected_logs),
@@ -389,7 +708,7 @@ def _process_selected_logs_impl(
                     processed_lines += event.report.lines_processed
         except ModelRedactionError as exc:
             model_redactor.release()
-            yield f"Model redaction failed: {exc}", None, report_preview_rows(file_reports), ""
+            yield _status_panel_html("error", "Model redaction failed", _safe_error(exc)), None, report_preview_rows(file_reports), ""
             return
         except Exception as exc:
             error_report = FileProcessReport(
@@ -402,14 +721,14 @@ def _process_selected_logs_impl(
 
     if not file_reports:
         model_redactor.release()
-        yield "No files were processed.", None, [], ""
+        yield _status_panel_html("warning", "No files processed", "The run ended before any report was created."), None, [], ""
         return
 
     zip_path = build_zip_archive(workspace, file_reports, config)
     model_redactor.release()
     progress(1.0, desc="Archive ready")
     yield (
-        _status_markdown(
+        _status_html(
             phase="Complete",
             file_index=len(selected_logs),
             file_total=len(selected_logs),
@@ -451,136 +770,210 @@ def update_source_visibility(source_mode: str):
 def update_backend_controls(compute_backend: str):
     if compute_backend == MODAL_CLOUD_BACKEND:
         return (
-            gr.update(visible=True),
+            gr.update(value=_modal_warning_html(), visible=True),
             gr.update(choices=MODAL_MODEL_OPTIONS, value=MODAL_MODEL_OPTIONS[0]),
         )
     return (
-        gr.update(visible=False),
+        gr.update(value="", visible=False),
         gr.update(choices=MODEL_OPTIONS, value=MODEL_OPTIONS[0]),
     )
 
 
+def _app_header_html() -> str:
+    return f"""
+    <style>{APP_CSS}</style>
+    <div class="app-shell">
+      <div class="app-topbar">
+        <div>
+          <div class="eyebrow">Trace Privacy Workbench</div>
+          <h1 class="app-title">Local Agent Trace Privacy Scrubber</h1>
+          <p class="app-subtitle">Inspect, redact, and package agent traces with explicit compute boundaries and auditable output reports.</p>
+        </div>
+        <div class="runtime-ledger" aria-label="Runtime boundaries">
+          <div class="ledger-cell"><span>Current runtime</span><strong>Local or Space ZeroGPU</strong></div>
+          <div class="ledger-cell"><span>Remote compute</span><strong>Modal opt-in only</strong></div>
+        </div>
+      </div>
+      <div class="flow-rail" aria-label="Workflow">
+        <div class="flow-step"><span>01</span>Source</div>
+        <div class="flow-step"><span>02</span>Policy</div>
+        <div class="flow-step"><span>03</span>Run</div>
+        <div class="flow-step"><span>04</span>Review</div>
+      </div>
+    </div>
+    """
+
+
+def _section_header_html(index: str, title: str) -> str:
+    return (
+        '<div class="section-heading">'
+        f"<h2>{_escape(title)}</h2>"
+        f"<span>{_escape(index)}</span>"
+        "</div>"
+    )
+
+
+def _modal_warning_html() -> str:
+    return _status_panel_html(
+        "warning",
+        "Remote compute selected",
+        "Regex redaction runs first here. Model-enabled string values are then sent to your deployed Modal app.",
+    )
+
+
+def _status_panel_html(
+    tone: str,
+    title: str,
+    detail: str,
+    *,
+    detail_is_html: bool = False,
+    metrics: list[tuple[str, str]] | None = None,
+) -> str:
+    detail_html = detail if detail_is_html else _escape(detail)
+    metrics_html = ""
+    if metrics:
+        metrics_html = '<div class="metric-grid">' + "".join(
+            f'<div class="metric"><span>{_escape(label)}</span><strong>{_escape(value)}</strong></div>'
+            for label, value in metrics
+        ) + "</div>"
+    return (
+        f'<div class="status-panel {_escape(tone)}">'
+        f"<strong>{_escape(title)}</strong>"
+        f"<p>{detail_html}</p>"
+        f"{metrics_html}"
+        "</div>"
+    )
+
+
+def _inline_warning_html(message: str) -> str:
+    return f'<div class="inline-warning">{_escape(message)}</div>'
+
+
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title=APP_NAME) as demo:
+    with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
         logs_state = gr.State([])
 
-        gr.Markdown(
-            f"# {APP_NAME}\n"
-            "Inspect and sanitize local Codex, Claude Code, and Pi Agent JSONL trace files before publishing."
-        )
-        gr.Markdown(
-            "**Local-first privacy scrubber.** The current-runtime backend processes traces where this "
-            "Gradio server is running. The optional Modal backend sends regex-sanitized trace text to "
-            "your deployed Modal app for GPU model inference."
-        )
-        gr.Markdown(
-            "Local path mode reads the filesystem of the machine running this Gradio server. "
-            "On a public Space, use only sample or non-sensitive uploaded logs."
-        )
+        gr.HTML(_app_header_html())
 
-        with gr.Group():
-            gr.Markdown("### Source")
-            source_mode = gr.Radio(SOURCE_OPTIONS, value="Known local source", label="Source input")
-            known_source = gr.Dropdown(
-                list(KNOWN_LOCAL_SOURCES.keys()),
-                value="Codex",
-                label="Known local source",
-                info="Default trace directories from Hugging Face Agent Traces docs.",
-            )
-            custom_path = gr.Textbox(
-                label="Custom local path",
-                placeholder="~/path/to/agent/sessions",
-                visible=False,
-            )
-            uploaded_files = gr.File(
-                label="Upload files",
-                file_count="multiple",
-                type="filepath",
-                file_types=[".jsonl", ".ndjson", ".json"],
-                visible=False,
-            )
-            uploaded_directory = gr.File(
-                label="Upload directory",
-                file_count="directory",
-                type="filepath",
-                file_types=[".jsonl", ".ndjson", ".json"],
-                visible=False,
-            )
+        with gr.Row(equal_height=False, elem_classes=["workbench-grid"]):
+            with gr.Column(scale=4, min_width=360):
+                with gr.Group(elem_classes=["tool-panel"]):
+                    gr.HTML(_section_header_html("01", "Source"))
+                    source_mode = gr.Radio(SOURCE_OPTIONS, value="Known local source", label="Input source")
+                    known_source = gr.Dropdown(
+                        list(KNOWN_LOCAL_SOURCES.keys()),
+                        value="Codex",
+                        label="Known source",
+                    )
+                    custom_path = gr.Textbox(
+                        label="Custom path",
+                        placeholder="~/path/to/agent/sessions",
+                        visible=False,
+                    )
+                    uploaded_files = gr.File(
+                        label="Upload files",
+                        file_count="multiple",
+                        type="filepath",
+                        file_types=[".jsonl", ".ndjson", ".json"],
+                        visible=False,
+                    )
+                    uploaded_directory = gr.File(
+                        label="Upload directory",
+                        file_count="directory",
+                        type="filepath",
+                        file_types=[".jsonl", ".ndjson", ".json"],
+                        visible=False,
+                    )
+                    scan_button = gr.Button("Scan logs", variant="primary", size="md")
+                    scan_status = gr.HTML(
+                        _status_panel_html("neutral", "Ready to scan", "Select a source and scan for trace files.")
+                    )
 
-        with gr.Group():
-            gr.Markdown("### Scan")
-            scan_status = gr.Markdown("No scan has run yet.")
-            with gr.Row():
-                scan_button = gr.Button("Scan logs", variant="primary")
-                select_all_button = gr.Button("Select all")
-                select_none_button = gr.Button("Select none")
-                select_likely_button = gr.Button("Select likely trace files only")
-            logs_table = gr.Dataframe(
-                headers=TABLE_HEADERS,
-                datatype=["bool", "str", "str", "str", "number", "number", "str"],
-                type="array",
-                row_count=0,
-                interactive=True,
-                label="Discovered logs",
-                wrap=True,
-            )
+                with gr.Group(elem_classes=["tool-panel"]):
+                    gr.HTML(_section_header_html("02", "Redaction policy"))
+                    compute_backend = gr.Dropdown(
+                        COMPUTE_BACKEND_OPTIONS,
+                        value=CURRENT_RUNTIME_BACKEND,
+                        label="Compute backend",
+                    )
+                    model_name = gr.Dropdown(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Privacy filter model")
+                    mode = gr.Dropdown(["mask", "remove", "hash", "replace"], value="mask", label="Redaction mode")
+                    modal_warning = gr.HTML(value="", visible=False)
+                    with gr.Row():
+                        regex_enabled = gr.Checkbox(True, label="Secret regex")
+                        model_enabled = gr.Checkbox(True, label="Model PII")
+                    with gr.Row():
+                        preserve_json_structure = gr.Checkbox(True, label="Preserve JSON")
+                        include_report = gr.Checkbox(True, label="Detailed report")
+                    with gr.Accordion("Advanced", open=False):
+                        chunk_size = gr.Slider(1000, 20000, value=6000, step=500, label="Chunk size")
+                        model_batch_size = gr.Slider(1, 128, value=32, step=1, label="Model batch size")
+                        max_file_size_warning_mb = gr.Slider(1, 500, value=50, step=1, label="Large file threshold (MB)")
+                        confidence_threshold = gr.Slider(0.0, 1.0, value=0.5, step=0.05, label="Confidence threshold")
+                        seed = gr.Number(value=2026, precision=0, label="Deterministic seed")
 
-        with gr.Group():
-            gr.Markdown("### Settings")
-            with gr.Row():
-                compute_backend = gr.Dropdown(
-                    COMPUTE_BACKEND_OPTIONS,
-                    value=CURRENT_RUNTIME_BACKEND,
-                    label="Compute backend",
-                )
-                model_name = gr.Dropdown(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Privacy filter model")
-                mode = gr.Dropdown(["mask", "remove", "hash", "replace"], value="mask", label="Redaction mode")
-            modal_warning = gr.Markdown(
-                "**Modal cloud GPU is remote compute.** Deterministic regex redaction runs first in this "
-                "app, then model-enabled string values are sent to Modal. Deploy `modal_app.py` with your "
-                "own Modal account before selecting this backend.",
-                visible=False,
-            )
-            with gr.Row():
-                regex_enabled = gr.Checkbox(True, label="Run deterministic secret regex sweep")
-                model_enabled = gr.Checkbox(True, label="Run model-based PII redaction")
-                preserve_json_structure = gr.Checkbox(True, label="Preserve JSON structure")
-                include_report = gr.Checkbox(True, label="Include detailed redaction report")
-            with gr.Accordion("Advanced", open=False):
-                chunk_size = gr.Slider(1000, 20000, value=6000, step=500, label="Chunk size")
-                model_batch_size = gr.Slider(1, 128, value=32, step=1, label="Model batch size")
-                max_file_size_warning_mb = gr.Slider(1, 500, value=50, step=1, label="Max file size warning threshold (MB)")
-                confidence_threshold = gr.Slider(0.0, 1.0, value=0.5, step=0.05, label="OpenMed confidence threshold")
-                seed = gr.Number(value=2026, precision=0, label="Seed for deterministic replacement/hash")
+            with gr.Column(scale=7, min_width=560):
+                with gr.Group(elem_classes=["tool-panel data-surface"]):
+                    gr.HTML(_section_header_html("03", "Selection"))
+                    with gr.Row(elem_classes=["compact-actions"]):
+                        select_all_button = gr.Button("Select all", size="sm")
+                        select_none_button = gr.Button("Clear", size="sm")
+                        select_likely_button = gr.Button("Select JSONL/NDJSON", size="sm")
+                    logs_table = gr.Dataframe(
+                        headers=TABLE_HEADERS,
+                        datatype=["bool", "str", "str", "str", "number", "number", "str"],
+                        type="array",
+                        row_count=0,
+                        interactive=True,
+                        label="Discovered logs",
+                        wrap=True,
+                        max_height=360,
+                        show_search="filter",
+                        pinned_columns=2,
+                        buttons=["copy", "fullscreen"],
+                    )
 
-        with gr.Group():
-            gr.Markdown("### Processing")
-            with gr.Row():
-                process_button = gr.Button("Process selected logs", variant="primary")
-                cancel_button = gr.Button("Cancel")
-            process_status = gr.Markdown("Waiting for selected logs.")
+                with gr.Group(elem_classes=["tool-panel"]):
+                    gr.HTML(_section_header_html("04", "Run"))
+                    with gr.Row(elem_classes=["compact-actions"]):
+                        process_button = gr.Button(
+                            "Process selected logs",
+                            variant="primary",
+                            size="lg",
+                            elem_classes=["primary-run"],
+                        )
+                        cancel_button = gr.Button("Cancel", variant="stop", size="lg")
+                    process_status = gr.HTML(
+                        _status_panel_html("neutral", "Waiting", "Scan and select trace files before processing.")
+                    )
 
-        with gr.Group():
-            gr.Markdown("### Output")
-            zip_output = gr.File(label="Download sanitized zip archive")
-            report_table = gr.Dataframe(
-                headers=REPORT_HEADERS,
-                datatype=["str", "number", "number", "number", "number", "number", "number", "number"],
-                type="array",
-                row_count=0,
-                interactive=False,
-                label="Report preview",
-            )
-            sanitized_preview = gr.Textbox(
-                label="Sanitized preview",
-                lines=10,
-                max_lines=14,
-                interactive=False,
-            )
+                with gr.Group(elem_classes=["tool-panel data-surface"]):
+                    gr.HTML(_section_header_html("05", "Review"))
+                    with gr.Tabs():
+                        with gr.Tab("Archive"):
+                            zip_output = gr.File(label="Sanitized archive")
+                        with gr.Tab("Report"):
+                            report_table = gr.Dataframe(
+                                headers=REPORT_HEADERS,
+                                datatype=["str", "number", "number", "number", "number", "number", "number", "number"],
+                                type="array",
+                                row_count=0,
+                                interactive=False,
+                                label="Redaction report",
+                                max_height=320,
+                                show_search="filter",
+                                buttons=["copy", "fullscreen"],
+                            )
+                        with gr.Tab("Preview"):
+                            sanitized_preview = gr.Textbox(
+                                label="Sanitized preview",
+                                lines=12,
+                                max_lines=16,
+                                interactive=False,
+                            )
 
-        gr.Markdown(
-            f"Version {APP_VERSION}. For real private logs, use the current-runtime backend locally, "
-            "or select Modal only when you intentionally trust and control that Modal deployment."
+        gr.HTML(
+            f'<div class="footer-note">Version {_escape(APP_VERSION)}. Current-runtime processing stays on this server; Modal is remote compute only when selected.</div>'
         )
 
         source_mode.change(
@@ -664,7 +1057,7 @@ def _safe_relative_output_path(relative_path: str) -> str:
     return Path(*parts).as_posix() if parts else "sanitized.jsonl"
 
 
-def _status_markdown(
+def _status_html(
     *,
     phase: str,
     file_index: int,
@@ -681,18 +1074,41 @@ def _status_markdown(
 ) -> str:
     elapsed = time.monotonic() - start_time
     eta = _eta(elapsed, processed_units, total_units)
-    line_status = ""
+    total_label = str(total_units) if total_units else "unknown"
+    progress_percent = 0
+    if total_units and processed_units <= total_units:
+        progress_percent = max(0, min(100, int(processed_units / total_units * 100)))
+    tone = "success" if phase == "Complete" else "active"
+    line_metric = ("Line", f"{current_line}/{file_lines or 'unknown'}") if current_line is not None else None
+    metrics = [
+        ("File", f"{file_index}/{file_total}"),
+        ("Progress", f"{processed_units}/{total_label} {unit_name}"),
+        ("Elapsed", _format_duration(elapsed)),
+        ("ETA", eta),
+        ("Regex", str(sum(regex_counts.values()))),
+        ("Model PII", str(sum(pii_counts.values()))),
+    ]
+    if line_metric is not None:
+        metrics.insert(2, line_metric)
+    metrics_html = '<div class="metric-grid">' + "".join(
+        f'<div class="metric"><span>{_escape(label)}</span><strong>{_escape(value)}</strong></div>'
+        for label, value in metrics
+    ) + "</div>"
     if current_line is not None:
-        line_status = f"\n- Current line: {current_line}/{file_lines or 'unknown'}"
+        current_file_label = f"{current_file} · line {current_line}/{file_lines or 'unknown'}"
+    else:
+        current_file_label = current_file
     return (
-        f"- Phase: **{phase}**\n"
-        f"- Current file: {file_index}/{file_total} `{current_file}`"
-        f"{line_status}\n"
-        f"- Progress: {processed_units}/{total_units or 'unknown'} {unit_name}\n"
-        f"- Elapsed: {_format_duration(elapsed)}\n"
-        f"- ETA: {eta}\n"
-        f"- Regex redactions so far: {sum(regex_counts.values())}\n"
-        f"- Model PII redactions so far: {sum(pii_counts.values())}"
+        f'<div class="run-status {tone}">'
+        '<div class="run-status__top">'
+        f'<span class="status-pill">{_escape(phase)}</span>'
+        f"<strong>{_escape(current_file_label)}</strong>"
+        "</div>"
+        '<div class="progress-track">'
+        f'<span class="progress-fill" style="width: {progress_percent}%"></span>'
+        "</div>"
+        f"{metrics_html}"
+        "</div>"
     )
 
 
@@ -728,6 +1144,14 @@ def _preview_sanitized_output(sanitized_root: Path, reports: Iterable[FileProces
         preview = "\n".join(lines)
         return preview[:4000]
     return ""
+
+
+def _inline_code(value: object) -> str:
+    return f"<code>{_escape(value)}</code>"
+
+
+def _escape(value: object) -> str:
+    return html.escape(str(value), quote=True)
 
 
 def _safe_error(exc: Exception) -> str:
