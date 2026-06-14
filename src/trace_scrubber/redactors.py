@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
+import gc
 import hashlib
 import re
-from typing import Any, Callable, Iterable, Literal
+from typing import Any, Callable, Iterable, Literal, Protocol
 
 RedactionMode = Literal["mask", "remove", "hash", "replace"]
 
@@ -27,7 +28,7 @@ class RedactionConfig:
     include_report: bool = True
     chunk_size: int = 6000
     confidence_threshold: float = 0.5
-    seed: int = 42
+    seed: int = 2026
 
 
 @dataclass
@@ -35,6 +36,22 @@ class TextRedactionResult:
     text: str
     regex_counts: Counter[str] = field(default_factory=Counter)
     pii_counts: Counter[str] = field(default_factory=Counter)
+
+
+class PIIRedactor(Protocol):
+    """Model redactor interface used by local and remote backends."""
+
+    def prepare_model(self, config: RedactionConfig) -> None:
+        """Load or validate model resources before processing."""
+        ...
+
+    def redact(self, text: str, config: RedactionConfig) -> TextRedactionResult:
+        """Redact PII spans from one text value."""
+        ...
+
+    def release(self) -> None:
+        """Release local resources held by the redactor."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -119,7 +136,7 @@ SECRET_RULES: tuple[SecretRule, ...] = (
 class SecretRegexRedactor:
     """Apply deterministic regex sweeps for common secrets."""
 
-    def __init__(self, seed: int = 42) -> None:
+    def __init__(self, seed: int = 2026) -> None:
         self.seed = seed
 
     def redact(self, text: str, mode: RedactionMode) -> TextRedactionResult:
@@ -173,15 +190,37 @@ class OpenMedPIIRedactor:
 
     def __init__(self) -> None:
         self._extract_pii: Callable[..., Any] | None = None
+        self._extract_pii_batch: Callable[..., list[Any]] | None = None
+        self._create_privacy_filter_pipeline: Callable[[str], Any] | None = None
+        self._privacy_backend_selector: Callable[[str], str] | None = None
+        self._privacy_model_resolver: Callable[[str, str], str] | None = None
+        self._torch_privacy_filter_pipeline_cls: type[Any] | None = None
+        self._is_trusted_for_remote_code: Callable[[str], bool] | None = None
+        self._privacy_model_detector: Callable[[str], bool] | None = None
         self._anonymizer_cls: type[Any] | None = None
         self._anonymizer: Any | None = None
+        self._privacy_filter_pipelines: dict[str, Any] = {}
 
     def ensure_available(self) -> None:
         if self._extract_pii is not None:
             return
         try:
             from openmed import extract_pii
+            from openmed.core.backends import (
+                create_privacy_filter_pipeline,
+                resolve_privacy_filter_model,
+                select_privacy_filter_backend,
+            )
             from openmed.core.anonymizer import Anonymizer
+            from openmed.core.pii import (
+                _extract_pii_batch,
+                _is_privacy_filter_artifact_path,
+                _looks_like_privacy_filter_identifier,
+            )
+            from openmed.torch.privacy_filter import (
+                PrivacyFilterTorchPipeline,
+                is_trusted_for_remote_code,
+            )
         except Exception as exc:  # pragma: no cover - depends on optional package
             raise ModelRedactionError(
                 "OpenMed is required for model-based PII redaction. Install it with "
@@ -189,7 +228,33 @@ class OpenMedPIIRedactor:
                 '`pip install -U "openmed[mlx]"`.'
             ) from exc
         self._extract_pii = extract_pii
+        self._extract_pii_batch = _extract_pii_batch
+        self._create_privacy_filter_pipeline = create_privacy_filter_pipeline
+        self._privacy_backend_selector = select_privacy_filter_backend
+        self._privacy_model_resolver = resolve_privacy_filter_model
+        self._torch_privacy_filter_pipeline_cls = PrivacyFilterTorchPipeline
+        self._is_trusted_for_remote_code = is_trusted_for_remote_code
+        self._privacy_model_detector = lambda model_name: (
+            _looks_like_privacy_filter_identifier(model_name)
+            or _is_privacy_filter_artifact_path(model_name)
+        )
         self._anonymizer_cls = Anonymizer
+
+    def prepare_model(self, config: RedactionConfig) -> None:
+        """Load reusable model resources before line-by-line processing."""
+
+        self.ensure_available()
+        if self._uses_privacy_filter_model(config.model_name):
+            self._get_privacy_filter_pipeline(config.model_name)
+
+    def release(self) -> None:
+        """Release cached local model resources and accelerator caches."""
+
+        self._privacy_filter_pipelines.clear()
+        self._anonymizer = None
+        gc.collect()
+        self._clear_mlx_cache()
+        self._clear_torch_cache()
 
     def redact(self, text: str, config: RedactionConfig) -> TextRedactionResult:
         if not text:
@@ -233,11 +298,20 @@ class OpenMedPIIRedactor:
     ) -> list[EntitySpan]:
         assert self._extract_pii is not None
         try:
-            result = self._extract_pii(
-                chunk,
-                model_name=config.model_name,
-                confidence_threshold=config.confidence_threshold,
-            )
+            if self._uses_privacy_filter_model(config.model_name):
+                assert self._extract_pii_batch is not None
+                result = self._extract_pii_batch(
+                    [chunk],
+                    model_name=config.model_name,
+                    confidence_threshold=config.confidence_threshold,
+                    privacy_filter_pipeline=self._get_privacy_filter_pipeline(config.model_name),
+                )[0]
+            else:
+                result = self._extract_pii(
+                    chunk,
+                    model_name=config.model_name,
+                    confidence_threshold=config.confidence_threshold,
+                )
         except Exception as exc:  # pragma: no cover - depends on model runtime
             raise ModelRedactionError(
                 "Local OpenMed model redaction failed. Verify the selected model, "
@@ -279,11 +353,119 @@ class OpenMedPIIRedactor:
                 raise ModelRedactionError("OpenMed replacement redaction failed.") from exc
         return f"<REDACTED:{label}>"
 
+    def _uses_privacy_filter_model(self, model_name: str) -> bool:
+        if self._privacy_model_detector is None:
+            self.ensure_available()
+        assert self._privacy_model_detector is not None
+        return self._privacy_model_detector(model_name)
+
+    def _get_privacy_filter_pipeline(self, model_name: str) -> Any:
+        pipeline = self._privacy_filter_pipelines.get(model_name)
+        if pipeline is not None:
+            return pipeline
+
+        if self._create_privacy_filter_pipeline is None:
+            self.ensure_available()
+        pipeline = self._build_privacy_filter_pipeline(model_name)
+        self._privacy_filter_pipelines[model_name] = pipeline
+        return pipeline
+
+    def _build_privacy_filter_pipeline(self, model_name: str) -> Any:
+        assert self._create_privacy_filter_pipeline is not None
+        if self._privacy_backend_selector is None:
+            self.ensure_available()
+        assert self._privacy_backend_selector is not None
+
+        backend = self._privacy_backend_selector(model_name)
+        if backend == "mlx":
+            return self._create_privacy_filter_pipeline(model_name)
+
+        if self._privacy_model_resolver is None or self._torch_privacy_filter_pipeline_cls is None:
+            self.ensure_available()
+        assert self._privacy_model_resolver is not None
+        assert self._torch_privacy_filter_pipeline_cls is not None
+        assert self._is_trusted_for_remote_code is not None
+
+        actual_model = self._privacy_model_resolver(model_name, "torch")
+        return self._torch_privacy_filter_pipeline_cls(
+            actual_model,
+            device=self._select_torch_device(),
+            trust_remote_code=self._is_trusted_for_remote_code(actual_model),
+        )
+
+    def _select_torch_device(self) -> str:
+        try:
+            import torch
+        except Exception:
+            return "cpu"
+
+        cuda = getattr(torch, "cuda", None)
+        if cuda is not None and callable(getattr(cuda, "is_available", None)):
+            try:
+                if cuda.is_available():
+                    return "cuda"
+            except Exception:
+                pass
+
+        backends = getattr(torch, "backends", None)
+        mps_backend = getattr(backends, "mps", None) if backends is not None else None
+        if mps_backend is not None and callable(getattr(mps_backend, "is_available", None)):
+            try:
+                if mps_backend.is_available():
+                    return "mps"
+            except Exception:
+                pass
+
+        return "cpu"
+
+    def _clear_mlx_cache(self) -> None:
+        try:
+            import mlx.core as mx
+        except Exception:
+            return
+
+        clear_cache = getattr(mx, "clear_cache", None)
+        if callable(clear_cache):
+            try:
+                clear_cache()
+                return
+            except Exception:
+                pass
+
+        metal = getattr(mx, "metal", None)
+        if metal is not None:
+            clear_cache = getattr(metal, "clear_cache", None)
+            if callable(clear_cache):
+                try:
+                    clear_cache()
+                except Exception:
+                    pass
+
+    def _clear_torch_cache(self) -> None:
+        try:
+            import torch
+        except Exception:
+            return
+
+        cuda = getattr(torch, "cuda", None)
+        if cuda is not None and callable(getattr(cuda, "empty_cache", None)):
+            try:
+                cuda.empty_cache()
+            except Exception:
+                pass
+
+        mps = getattr(torch, "mps", None)
+        if mps is not None and callable(getattr(mps, "empty_cache", None)):
+            try:
+                mps.empty_cache()
+            except Exception:
+                pass
+
 
 def sanitize_text(
     text: str,
     config: RedactionConfig,
-    model_redactor: OpenMedPIIRedactor | None = None,
+    model_redactor: PIIRedactor | None = None,
 ) -> TextRedactionResult:
     """Run configured redaction passes over one text string."""
 

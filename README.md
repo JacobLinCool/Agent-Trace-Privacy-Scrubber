@@ -25,13 +25,15 @@ tags:
 
 A local-first Gradio app for sanitizing raw JSONL agent traces before uploading them to Hugging Face Datasets, Storage Buckets, or any public trace viewer.
 
-Agent traces from Codex, Claude Code, and Pi Agent can include prompts, tool inputs, command output, private paths, screenshots references, secrets, private code, and personal data. This app helps you discover those logs, select the files to process, run deterministic secret redaction and optional OpenMed/Nemotron PII redaction locally, then download sanitized JSONL files as a zip archive with a redaction report.
+Agent traces from Codex, Claude Code, and Pi Agent can include prompts, tool inputs, command output, private paths, screenshots references, secrets, private code, and personal data. This app helps you discover those logs, select the files to process, run deterministic secret redaction and optional OpenMed/Nemotron PII redaction, then download sanitized JSONL files as a zip archive with a redaction report.
 
 **For real private logs, run this locally. Do not upload sensitive traces to a public Space.**
 
 ## Why Local Processing Matters
 
-The app does not call remote inference APIs for trace content. Redaction runs inside the Python process where Gradio is running. The selected OpenMed model may download weights from Hugging Face the first time it runs, but trace contents are not sent to Hugging Face Inference API, OpenAI API, Anthropic API, analytics, telemetry, or any external LLM service.
+The default current-runtime backend runs redaction inside the Python process where Gradio is running. On your Mac, that means local compute. On Hugging Face ZeroGPU, that means the Space runtime. The selected OpenMed model may download weights from Hugging Face the first time it runs, but trace contents are not sent to Hugging Face Inference API, OpenAI API, Anthropic API, analytics, telemetry, or any external LLM service.
+
+The optional Modal backend is different: deterministic regex redaction runs first in the app process, then model-enabled string values are sent to your deployed Modal app for CUDA GPU inference. Use it only when you intentionally trust and control that Modal deployment.
 
 Do not launch with `share=True` for private logs.
 
@@ -52,6 +54,17 @@ For Apple Silicon / MLX:
 pip install -U "openmed[mlx]"
 ```
 
+## Modal Cloud GPU Backend
+
+Modal is an opt-in remote compute backend for CUDA GPU model inference. Deploy the worker once:
+
+```bash
+modal token new
+modal deploy modal_app.py
+```
+
+Then select **Modal cloud GPU** in the app settings. Modal currently supports `OpenMed/privacy-filter-nemotron` in this project. Use the current-runtime backend for Apple MLX models.
+
 ## Common Trace Locations
 
 - Codex sessions: `~/.codex/sessions`
@@ -65,7 +78,7 @@ When the app runs locally, the local path scanner reads your own machine. When d
 1. Choose a source: known local source, custom local path, uploaded files, uploaded directory, or bundled sample logs.
 2. Click **Scan logs**.
 3. Review discovered JSONL/NDJSON/JSON files and choose all or individual files.
-4. Pick a model and redaction mode:
+4. Pick a compute backend, model, and redaction mode:
    - `mask`: placeholders such as `<REDACTED:email>`.
    - `remove`: delete detected sensitive spans.
    - `hash`: stable placeholders such as `<HASHED:email:abc123>`.
@@ -83,7 +96,7 @@ For each selected file, the processor reads UTF-8 text with safe replacement for
 - Valid JSON lines are parsed, and only string values are recursively redacted. Object keys, arrays, numbers, booleans, nulls, and line boundaries are preserved.
 - Invalid JSON lines are sanitized as raw text and recorded in the report.
 - Deterministic regex sweeps run before and after model redaction.
-- Optional OpenMed PII redaction uses the selected model locally.
+- Optional OpenMed PII redaction uses the selected backend.
 - Long strings are chunked for model inference.
 - Outputs preserve relative paths under a temp output directory.
 
@@ -98,7 +111,6 @@ Default model:
 Apple Silicon options:
 
 - `OpenMed/privacy-filter-nemotron-mlx`
-- `OpenMed/privacy-filter-nemotron-mlx-8bit`
 
 OpenMed exposes `extract_pii()` and `deidentify()` APIs for local PII detection and de-identification. This app uses local extraction spans so it can count labels and preserve reports without including raw matched values.
 

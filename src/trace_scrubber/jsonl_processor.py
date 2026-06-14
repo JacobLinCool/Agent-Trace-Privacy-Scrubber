@@ -9,7 +9,7 @@ from pathlib import Path
 import time
 from typing import Iterator
 
-from .redactors import OpenMedPIIRedactor, RedactionConfig, TextRedactionResult, sanitize_text
+from .redactors import OpenMedPIIRedactor, PIIRedactor, RedactionConfig, TextRedactionResult, sanitize_text
 
 
 @dataclass
@@ -62,7 +62,7 @@ class ProcessEvent:
 def sanitize_json_value(
     value: object,
     config: RedactionConfig,
-    model_redactor: OpenMedPIIRedactor | None = None,
+    model_redactor: PIIRedactor | None = None,
 ) -> tuple[object, TextRedactionResult]:
     """Recursively redact string values while preserving JSON structure."""
 
@@ -99,7 +99,7 @@ def process_jsonl_file(
     relative_path: str,
     config: RedactionConfig,
     total_lines: int = 0,
-    model_redactor: OpenMedPIIRedactor | None = None,
+    model_redactor: PIIRedactor | None = None,
 ) -> FileProcessReport:
     """Process a JSONL file and return its report."""
 
@@ -125,8 +125,9 @@ def process_jsonl_file_iter(
     relative_path: str,
     config: RedactionConfig,
     total_lines: int = 0,
-    model_redactor: OpenMedPIIRedactor | None = None,
-    progress_interval: int = 25,
+    model_redactor: PIIRedactor | None = None,
+    progress_interval: int = 1,
+    progress_debounce_seconds: float = 2.0,
 ) -> Iterator[ProcessEvent]:
     """Yield progress while processing one JSONL trace file line by line."""
 
@@ -140,6 +141,8 @@ def process_jsonl_file_iter(
         output_relative_path=relative_path,
         bytes_in=input_file.stat().st_size,
     )
+    last_progress_at = 0.0
+    last_progress_line = 0
 
     with input_file.open("r", encoding="utf-8", errors="replace") as reader, output_file.open(
         "w",
@@ -160,21 +163,29 @@ def process_jsonl_file_iter(
             report.counts_by_regex_secret_rule.update(result.redaction.regex_counts)
             report.counts_by_pii_label.update(result.redaction.pii_counts)
 
-            if line_number == 1 or line_number % progress_interval == 0:
+            now = time.monotonic()
+            should_emit = (
+                line_number == 1
+                or (
+                    line_number % max(1, progress_interval) == 0
+                    and now - last_progress_at >= progress_debounce_seconds
+                )
+            )
+            if should_emit:
+                last_progress_at = now
+                last_progress_line = line_number
                 yield ProcessEvent(
                     kind="progress",
-                    progress=ProcessProgress(
-                        relative_path=relative_path,
-                        line_number=line_number,
-                        total_lines=total_lines,
-                        bytes_in=report.bytes_in,
-                        counts_by_pii_label=report.counts_by_pii_label.copy(),
-                        counts_by_regex_secret_rule=report.counts_by_regex_secret_rule.copy(),
-                    ),
+                    progress=_build_progress(relative_path, total_lines, report),
                 )
 
     report.bytes_out = output_file.stat().st_size
     report.duration_seconds = time.monotonic() - start_time
+    if report.lines_processed and last_progress_line != report.lines_processed:
+        yield ProcessEvent(
+            kind="progress",
+            progress=_build_progress(relative_path, total_lines, report),
+        )
     yield ProcessEvent(kind="complete", report=report)
 
 
@@ -185,10 +196,25 @@ class _LineResult:
     invalid_json: bool = False
 
 
+def _build_progress(
+    relative_path: str,
+    total_lines: int,
+    report: FileProcessReport,
+) -> ProcessProgress:
+    return ProcessProgress(
+        relative_path=relative_path,
+        line_number=report.lines_processed,
+        total_lines=total_lines,
+        bytes_in=report.bytes_in,
+        counts_by_pii_label=report.counts_by_pii_label.copy(),
+        counts_by_regex_secret_rule=report.counts_by_regex_secret_rule.copy(),
+    )
+
+
 def _sanitize_jsonl_line(
     raw_line: str,
     config: RedactionConfig,
-    model_redactor: OpenMedPIIRedactor,
+    model_redactor: PIIRedactor,
 ) -> _LineResult:
     if config.preserve_json_structure:
         try:

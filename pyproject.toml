@@ -1,3 +1,21 @@
+[project]
+name = "agent-trace-privacy-scrubber"
+version = "0.1.0"
+description = "Local agent trace privacy scrubber"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "gradio>=6.0",
+    "huggingface-hub>=0.30",
+    "modal>=1.5.0",
+    "openmed[hf]>=1.5.5",
+    "pytest>=8.0",
+    "spaces>=0.50.4",
+    "torch>=2.0",
+    "tqdm>=4.66",
+    "transformers>=4.50",
+]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

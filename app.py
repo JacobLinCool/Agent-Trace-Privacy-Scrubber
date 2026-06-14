@@ -8,6 +8,22 @@ from typing import Any, Iterable
 
 import gradio as gr
 
+try:
+    import spaces
+except ImportError:  # pragma: no cover - local dev can run before dependencies install.
+    class _SpacesFallback:
+        @staticmethod
+        def GPU(*args, **kwargs):
+            if args and callable(args[0]) and len(args) == 1 and not kwargs:
+                return args[0]
+
+            def decorator(fn):
+                return fn
+
+            return decorator
+
+    spaces = _SpacesFallback()
+
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -24,7 +40,8 @@ from trace_scrubber.discovery import (
     selected_relative_paths,
 )
 from trace_scrubber.jsonl_processor import FileProcessReport, process_jsonl_file_iter
-from trace_scrubber.redactors import ModelRedactionError, OpenMedPIIRedactor, RedactionConfig
+from trace_scrubber.modal_backend import ModalPIIRedactor
+from trace_scrubber.redactors import ModelRedactionError, OpenMedPIIRedactor, PIIRedactor, RedactionConfig
 from trace_scrubber.reporting import report_preview_rows
 from trace_scrubber.zipper import build_zip_archive, make_output_workspace
 
@@ -52,8 +69,12 @@ REPORT_HEADERS = [
 MODEL_OPTIONS = [
     "OpenMed/privacy-filter-nemotron",
     "OpenMed/privacy-filter-nemotron-mlx",
-    "OpenMed/privacy-filter-nemotron-mlx-8bit",
 ]
+
+CURRENT_RUNTIME_BACKEND = "Current app runtime (local machine or Space ZeroGPU)"
+MODAL_CLOUD_BACKEND = "Modal cloud GPU (sends regex-sanitized text to Modal)"
+COMPUTE_BACKEND_OPTIONS = [CURRENT_RUNTIME_BACKEND, MODAL_CLOUD_BACKEND]
+MODAL_MODEL_OPTIONS = ["OpenMed/privacy-filter-nemotron"]
 
 SOURCE_OPTIONS = [
     "Known local source",
@@ -134,6 +155,93 @@ def select_likely_trace_files(table_data: object) -> list[list[object]]:
 def process_selected_logs(
     table_data: object,
     logs_state: list[dict[str, object]] | None,
+    compute_backend: str,
+    model_name: str,
+    mode: str,
+    regex_enabled: bool,
+    model_enabled: bool,
+    preserve_json_structure: bool,
+    include_report: bool,
+    chunk_size: int,
+    max_file_size_warning_mb: int,
+    confidence_threshold: float,
+    seed: int,
+    progress: gr.Progress = gr.Progress(),
+):
+    if compute_backend == MODAL_CLOUD_BACKEND or not model_enabled:
+        yield from _process_selected_logs_impl(
+            table_data,
+            logs_state,
+            compute_backend,
+            model_name,
+            mode,
+            regex_enabled,
+            model_enabled,
+            preserve_json_structure,
+            include_report,
+            chunk_size,
+            max_file_size_warning_mb,
+            confidence_threshold,
+            seed,
+            progress,
+        )
+        return
+
+    yield from _process_selected_logs_current_runtime(
+        table_data,
+        logs_state,
+        model_name,
+        mode,
+        regex_enabled,
+        model_enabled,
+        preserve_json_structure,
+        include_report,
+        chunk_size,
+        max_file_size_warning_mb,
+        confidence_threshold,
+        seed,
+        progress,
+    )
+
+
+@spaces.GPU(duration=1800)
+def _process_selected_logs_current_runtime(
+    table_data: object,
+    logs_state: list[dict[str, object]] | None,
+    model_name: str,
+    mode: str,
+    regex_enabled: bool,
+    model_enabled: bool,
+    preserve_json_structure: bool,
+    include_report: bool,
+    chunk_size: int,
+    max_file_size_warning_mb: int,
+    confidence_threshold: float,
+    seed: int,
+    progress: gr.Progress = gr.Progress(),
+):
+    yield from _process_selected_logs_impl(
+        table_data,
+        logs_state,
+        CURRENT_RUNTIME_BACKEND,
+        model_name,
+        mode,
+        regex_enabled,
+        model_enabled,
+        preserve_json_structure,
+        include_report,
+        chunk_size,
+        max_file_size_warning_mb,
+        confidence_threshold,
+        seed,
+        progress,
+    )
+
+
+def _process_selected_logs_impl(
+    table_data: object,
+    logs_state: list[dict[str, object]] | None,
+    compute_backend: str,
     model_name: str,
     mode: str,
     regex_enabled: bool,
@@ -162,6 +270,16 @@ def process_selected_logs(
         yield "Select at least one log file before processing.", None, [], ""
         return
 
+    if model_enabled and compute_backend == MODAL_CLOUD_BACKEND and model_name not in MODAL_MODEL_OPTIONS:
+        yield (
+            "Modal cloud GPU currently supports `OpenMed/privacy-filter-nemotron` only. "
+            "Choose the current app runtime for Apple MLX models.",
+            None,
+            [],
+            "",
+        )
+        return
+
     config = RedactionConfig(
         model_name=model_name,
         mode=mode,  # type: ignore[arg-type]
@@ -176,7 +294,7 @@ def process_selected_logs(
 
     workspace = make_output_workspace()
     sanitized_root = workspace / "sanitized"
-    model_redactor = OpenMedPIIRedactor()
+    model_redactor = _build_model_redactor(compute_backend)
     file_reports: list[FileProcessReport] = []
     total_lines = sum(int(log.get("line_count") or 0) for log in selected_logs)
     total_bytes = sum(int(log.get("size_bytes") or 0) for log in selected_logs)
@@ -187,7 +305,7 @@ def process_selected_logs(
     if model_enabled:
         yield (
             _status_markdown(
-                phase="Loading local OpenMed model",
+                phase=_loading_phase(compute_backend),
                 file_index=0,
                 file_total=len(selected_logs),
                 current_file="waiting for first inference",
@@ -203,8 +321,9 @@ def process_selected_logs(
             "",
         )
         try:
-            model_redactor.ensure_available()
+            model_redactor.prepare_model(config)
         except ModelRedactionError as exc:
+            model_redactor.release()
             yield f"Model redaction is unavailable: {exc}", None, [], ""
             return
 
@@ -262,6 +381,7 @@ def process_selected_logs(
                     aggregate_pii.update(event.report.counts_by_pii_label)
                     processed_lines += event.report.lines_processed
         except ModelRedactionError as exc:
+            model_redactor.release()
             yield f"Model redaction failed: {exc}", None, report_preview_rows(file_reports), ""
             return
         except Exception as exc:
@@ -274,10 +394,12 @@ def process_selected_logs(
             file_reports.append(error_report)
 
     if not file_reports:
+        model_redactor.release()
         yield "No files were processed.", None, [], ""
         return
 
     zip_path = build_zip_archive(workspace, file_reports, config)
+    model_redactor.release()
     progress(1.0, desc="Archive ready")
     yield (
         _status_markdown(
@@ -298,12 +420,36 @@ def process_selected_logs(
     )
 
 
+def _build_model_redactor(compute_backend: str) -> PIIRedactor:
+    if compute_backend == MODAL_CLOUD_BACKEND:
+        return ModalPIIRedactor()
+    return OpenMedPIIRedactor()
+
+
+def _loading_phase(compute_backend: str) -> str:
+    if compute_backend == MODAL_CLOUD_BACKEND:
+        return "Connecting to Modal cloud GPU backend"
+    return "Loading current-runtime OpenMed model"
+
+
 def update_source_visibility(source_mode: str):
     return (
         gr.update(visible=source_mode == "Known local source"),
         gr.update(visible=source_mode == "Custom local path"),
         gr.update(visible=source_mode == "Upload files"),
         gr.update(visible=source_mode == "Upload directory"),
+    )
+
+
+def update_backend_controls(compute_backend: str):
+    if compute_backend == MODAL_CLOUD_BACKEND:
+        return (
+            gr.update(visible=True),
+            gr.update(choices=MODAL_MODEL_OPTIONS, value=MODAL_MODEL_OPTIONS[0]),
+        )
+    return (
+        gr.update(visible=False),
+        gr.update(choices=MODEL_OPTIONS, value=MODEL_OPTIONS[0]),
     )
 
 
@@ -316,8 +462,9 @@ def build_app() -> gr.Blocks:
             "Inspect and sanitize local Codex, Claude Code, and Pi Agent JSONL trace files before publishing."
         )
         gr.Markdown(
-            "**Local-first privacy scrubber. Real traces should be processed on your own machine. "
-            "This app does not use remote inference APIs.**"
+            "**Local-first privacy scrubber.** The current-runtime backend processes traces where this "
+            "Gradio server is running. The optional Modal backend sends regex-sanitized trace text to "
+            "your deployed Modal app for GPU model inference."
         )
         gr.Markdown(
             "Local path mode reads the filesystem of the machine running this Gradio server. "
@@ -374,8 +521,19 @@ def build_app() -> gr.Blocks:
         with gr.Group():
             gr.Markdown("### Settings")
             with gr.Row():
+                compute_backend = gr.Dropdown(
+                    COMPUTE_BACKEND_OPTIONS,
+                    value=CURRENT_RUNTIME_BACKEND,
+                    label="Compute backend",
+                )
                 model_name = gr.Dropdown(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Privacy filter model")
                 mode = gr.Dropdown(["mask", "remove", "hash", "replace"], value="mask", label="Redaction mode")
+            modal_warning = gr.Markdown(
+                "**Modal cloud GPU is remote compute.** Deterministic regex redaction runs first in this "
+                "app, then model-enabled string values are sent to Modal. Deploy `modal_app.py` with your "
+                "own Modal account before selecting this backend.",
+                visible=False,
+            )
             with gr.Row():
                 regex_enabled = gr.Checkbox(True, label="Run deterministic secret regex sweep")
                 model_enabled = gr.Checkbox(True, label="Run model-based PII redaction")
@@ -385,7 +543,7 @@ def build_app() -> gr.Blocks:
                 chunk_size = gr.Slider(1000, 20000, value=6000, step=500, label="Chunk size")
                 max_file_size_warning_mb = gr.Slider(1, 500, value=50, step=1, label="Max file size warning threshold (MB)")
                 confidence_threshold = gr.Slider(0.0, 1.0, value=0.5, step=0.05, label="OpenMed confidence threshold")
-                seed = gr.Number(value=42, precision=0, label="Seed for deterministic replacement/hash")
+                seed = gr.Number(value=2026, precision=0, label="Seed for deterministic replacement/hash")
 
         with gr.Group():
             gr.Markdown("### Processing")
@@ -412,12 +570,20 @@ def build_app() -> gr.Blocks:
                 interactive=False,
             )
 
-        gr.Markdown(f"Version {APP_VERSION}. For real private logs, run this locally. Do not upload sensitive traces to a public Space.")
+        gr.Markdown(
+            f"Version {APP_VERSION}. For real private logs, use the current-runtime backend locally, "
+            "or select Modal only when you intentionally trust and control that Modal deployment."
+        )
 
         source_mode.change(
             update_source_visibility,
             inputs=[source_mode],
             outputs=[known_source, custom_path, uploaded_files, uploaded_directory],
+        )
+        compute_backend.change(
+            update_backend_controls,
+            inputs=[compute_backend],
+            outputs=[modal_warning, model_name],
         )
         scan_button.click(
             scan_logs,
@@ -440,6 +606,7 @@ def build_app() -> gr.Blocks:
             inputs=[
                 logs_table,
                 logs_state,
+                compute_backend,
                 model_name,
                 mode,
                 regex_enabled,
