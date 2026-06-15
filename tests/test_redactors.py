@@ -113,6 +113,58 @@ def test_openmed_privacy_filter_pipeline_is_cached() -> None:
     assert redactor._privacy_filter_pipelines == {}
 
 
+def test_structural_tokens_are_not_redacted() -> None:
+    @dataclass
+    class FakeEntity:
+        text: str
+        label: str
+        start: int
+        end: int
+        confidence: float = 0.99
+
+    @dataclass
+    class FakeResult:
+        entities: list[FakeEntity]
+
+    def extract_batch(texts: list[str], **kwargs: Any) -> list[FakeResult]:
+        # Label every input fully as an occupation, like the model does for roles.
+        return [
+            FakeResult(
+                entities=[FakeEntity(text=t, label="occupation", start=0, end=len(t))]
+            )
+            for t in texts
+        ]
+
+    redactor = OpenMedPIIRedactor()
+    redactor._extract_pii = lambda *args, **kwargs: None
+    redactor._extract_pii_batch = extract_batch
+    redactor._create_privacy_filter_pipeline = lambda model_name: object()
+    redactor._privacy_backend_selector = lambda model_name: "mlx"
+    redactor._privacy_model_detector = lambda model_name: True
+    config = RedactionConfig(
+        model_name="OpenMed/privacy-filter-nemotron-mlx",
+        regex_enabled=False,
+        model_enabled=True,
+    )
+    redactor.prepare_model(config)
+
+    # "assistant" (a message role) must survive untouched...
+    assert redactor.redact("assistant", config).text == "assistant"
+    assert redactor.redact("response_item", config).text == "response_item"
+    # ...while a genuine occupation is still redacted.
+    assert redactor.redact("Dentist", config).text == "<REDACTED:occupation>"
+
+
+def test_is_structural_token_is_case_and_whitespace_insensitive() -> None:
+    from trace_scrubber.redactors import _is_structural_token
+
+    assert _is_structural_token("assistant")
+    assert _is_structural_token("  USER ")
+    assert _is_structural_token("Response_Item")
+    assert not _is_structural_token("alice@example.com")
+    assert not _is_structural_token("Dr. Smith")
+
+
 def test_non_mlx_privacy_filter_prefers_selected_torch_device() -> None:
     created: list[dict[str, Any]] = []
 

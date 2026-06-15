@@ -28,6 +28,7 @@ from trace_scrubber.discovery import (
 from trace_scrubber.jsonl_processor import FileProcessReport, process_jsonl_file_iter
 from trace_scrubber.modal_backend import ModalPIIRedactor
 from trace_scrubber.redactors import (
+    CachingPIIRedactor,
     ModelRedactionError,
     OpenMedPIIRedactor,
     PIIRedactor,
@@ -627,6 +628,7 @@ def process_selected_logs(
     max_file_size_warning_mb: int,
     confidence_threshold: float,
     seed: int,
+    modal_request_batch_size: int = 256,
     progress: gr.Progress = gr.Progress(),
 ):
     if compute_backend == MODAL_CLOUD_BACKEND or not model_enabled:
@@ -645,6 +647,7 @@ def process_selected_logs(
             max_file_size_warning_mb,
             confidence_threshold,
             seed,
+            modal_request_batch_size,
             progress,
         )
         return
@@ -663,6 +666,7 @@ def process_selected_logs(
         max_file_size_warning_mb,
         confidence_threshold,
         seed,
+        modal_request_batch_size,
         progress,
     )
 
@@ -682,6 +686,7 @@ def _process_selected_logs_current_runtime(
     max_file_size_warning_mb: int,
     confidence_threshold: float,
     seed: int,
+    modal_request_batch_size: int = 256,
     progress: gr.Progress = gr.Progress(),
 ):
     yield from _process_selected_logs_impl(
@@ -699,6 +704,7 @@ def _process_selected_logs_current_runtime(
         max_file_size_warning_mb,
         confidence_threshold,
         seed,
+        modal_request_batch_size,
         progress,
     )
 
@@ -718,6 +724,7 @@ def _process_selected_logs_impl(
     max_file_size_warning_mb: int,
     confidence_threshold: float,
     seed: int,
+    modal_request_batch_size: int = 256,
     progress: gr.Progress = gr.Progress(),
 ):
     if not regex_enabled and not model_enabled:
@@ -781,7 +788,9 @@ def _process_selected_logs_impl(
 
     workspace = make_output_workspace()
     sanitized_root = workspace / "sanitized"
-    model_redactor = _build_model_redactor(compute_backend, int(model_batch_size))
+    model_redactor = _build_model_redactor(
+        compute_backend, int(modal_request_batch_size)
+    )
     file_reports: list[FileProcessReport] = []
     total_lines = sum(int(log.get("line_count") or 0) for log in selected_logs)
     total_bytes = sum(int(log.get("size_bytes") or 0) for log in selected_logs)
@@ -933,10 +942,16 @@ def _process_selected_logs_impl(
     )
 
 
-def _build_model_redactor(compute_backend: str, model_batch_size: int) -> PIIRedactor:
+def _build_model_redactor(
+    compute_backend: str, request_batch_size: int
+) -> PIIRedactor:
     if compute_backend == MODAL_CLOUD_BACKEND:
-        return ModalPIIRedactor(batch_size=model_batch_size)
-    return OpenMedPIIRedactor()
+        inner: PIIRedactor = ModalPIIRedactor(batch_size=max(1, int(request_batch_size)))
+    else:
+        inner = OpenMedPIIRedactor()
+    # Deduplicate identical strings (heavy in agent traces) across the whole run
+    # so the model — and, for Modal, the network — only sees each value once.
+    return CachingPIIRedactor(inner)
 
 
 def _loading_phase(compute_backend: str) -> str:
@@ -1114,10 +1129,17 @@ def build_app() -> gr.Blocks:
                         include_report = gr.Checkbox(True, label="Detailed report")
                     with gr.Accordion("Advanced", open=False):
                         chunk_size = gr.Slider(
-                            1000, 20000, value=6000, step=500, label="Chunk size"
+                            1000, 20000, value=3000, step=500, label="Chunk size"
                         )
                         model_batch_size = gr.Slider(
-                            1, 128, value=32, step=1, label="Model batch size"
+                            1, 128, value=64, step=1, label="Model batch size (GPU)"
+                        )
+                        modal_request_batch_size = gr.Slider(
+                            1,
+                            1024,
+                            value=256,
+                            step=1,
+                            label="Modal request batch (strings / round-trip)",
                         )
                         max_file_size_warning_mb = gr.Slider(
                             1, 500, value=50, step=1, label="Large file threshold (MB)"
@@ -1261,6 +1283,7 @@ def build_app() -> gr.Blocks:
                 max_file_size_warning_mb,
                 confidence_threshold,
                 seed,
+                modal_request_batch_size,
             ],
             outputs=[process_status, zip_output, report_table, sanitized_preview],
         )

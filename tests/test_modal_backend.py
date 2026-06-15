@@ -41,7 +41,7 @@ def test_modal_redactor_calls_deployed_batch_function() -> None:
                 "model_name": "OpenMed/privacy-filter-nemotron",
                 "mode": "mask",
                 "chunk_size": 4096,
-                "model_batch_size": 32,
+                "model_batch_size": 16,
                 "confidence_threshold": 0.75,
                 "seed": 7,
             },
@@ -76,3 +76,54 @@ def test_modal_redactor_batches_multiple_texts() -> None:
     ]
     assert [result.pii_counts["name"] for result in results] == [1, 1, 1]
     assert calls == [["one", "two"], ["three"]]
+
+
+def test_modal_request_batch_splits_by_char_budget() -> None:
+    calls: list[list[str]] = []
+
+    class FakeFunction:
+        def remote(
+            self, texts: list[str], settings: dict[str, object]
+        ) -> list[dict[str, Any]]:
+            calls.append(list(texts))
+            return [{"text": text, "pii_counts": {}} for text in texts]
+
+    redactor = ModalPIIRedactor(
+        batch_size=16,
+        request_max_chars=10,
+        function_lookup=lambda app_name, function_name: FakeFunction(),
+    )
+    config = RedactionConfig(model_name="OpenMed/privacy-filter-nemotron")
+    big = "x" * 20
+
+    redactor.redact_many(["aa", "bb", "cc", big, "dd"], config)
+
+    # count cap (16) never trips; the char budget packs the small strings, gives
+    # the oversized string its own round-trip, then continues.
+    assert calls == [["aa", "bb", "cc"], [big], ["dd"]]
+
+
+def test_modal_request_batch_decoupled_from_gpu_batch() -> None:
+    gpu_batches: list[object] = []
+
+    class FakeFunction:
+        def remote(
+            self, texts: list[str], settings: dict[str, object]
+        ) -> list[dict[str, Any]]:
+            gpu_batches.append(settings["model_batch_size"])
+            return [{"text": text, "pii_counts": {}} for text in texts]
+
+    redactor = ModalPIIRedactor(
+        batch_size=2,  # network/request batch
+        function_lookup=lambda app_name, function_name: FakeFunction(),
+    )
+    config = RedactionConfig(
+        model_name="OpenMed/privacy-filter-nemotron", model_batch_size=64
+    )
+
+    redactor.redact_many(["a", "b", "c"], config)
+
+    # Network batch of 2 -> two round-trips, while the GPU batch stays at the
+    # config value (64) independently.
+    assert len(gpu_batches) == 2
+    assert gpu_batches == [64, 64]

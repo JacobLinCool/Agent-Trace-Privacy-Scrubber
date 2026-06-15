@@ -123,3 +123,69 @@ def test_model_redaction_batches_across_jsonl_lines(tmp_path: Path) -> None:
         '{"content":"<PII:1>"}',
         '{"nested":["<PII:2>"]}',
     ]
+
+
+def test_is_protected_key_matches_identifier_keys_only() -> None:
+    from trace_scrubber.jsonl_processor import _is_protected_key
+
+    for key in [
+        "call_id", "id", "ID", "uuid", "sessionId", "parentUuid", "requestId",
+        "promptId", "tool_use_id", "messageId", "leafUuid",
+        "sourceToolAssistantUUID", "menu_item_id",
+    ]:
+        assert _is_protected_key(key), f"should protect {key!r}"
+
+    for key in [
+        "valid", "android", "grid", "void", "hybrid", "candid", "paid",
+        "role", "content", "name", "email", "type", "key", "model",
+    ]:
+        assert not _is_protected_key(key), f"should NOT protect {key!r}"
+
+
+def test_identifier_key_values_are_excluded_from_redaction(tmp_path: Path) -> None:
+    import json
+
+    class FakeBatchRedactor:
+        batch_size = 8
+
+        def prepare_model(self, config: RedactionConfig) -> None:
+            pass
+
+        def redact(self, text: str, config: RedactionConfig) -> TextRedactionResult:
+            return self.redact_many([text], config)[0]
+
+        def redact_many(
+            self, texts: list[str], config: RedactionConfig
+        ) -> list[TextRedactionResult]:
+            calls.append(texts)
+            return [TextRedactionResult(text="<PII>") for _ in texts]
+
+        def release(self) -> None:
+            pass
+
+    calls: list[list[str]] = []
+    input_file = tmp_path / "trace.jsonl"
+    output_file = tmp_path / "out" / "trace.jsonl"
+    input_file.write_text(
+        '{"call_id":"call_abc123","sessionId":"sess_x","parentUuid":"u-1",'
+        '"content":"alice@example.com"}\n',
+        encoding="utf-8",
+    )
+    config = RedactionConfig(regex_enabled=False, model_enabled=True)
+
+    process_jsonl_file(
+        input_file,
+        output_file,
+        "trace.jsonl",
+        config,
+        total_lines=1,
+        model_redactor=FakeBatchRedactor(),
+    )
+
+    # Identifier values never reach the model; only the real content does.
+    assert calls == [["alice@example.com"]]
+    obj = json.loads(output_file.read_text(encoding="utf-8").strip())
+    assert obj["call_id"] == "call_abc123"
+    assert obj["sessionId"] == "sess_x"
+    assert obj["parentUuid"] == "u-1"
+    assert obj["content"] == "<PII>"

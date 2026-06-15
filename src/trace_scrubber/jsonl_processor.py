@@ -6,6 +6,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
+import re
 import time
 from typing import Iterator, TextIO
 
@@ -124,6 +125,22 @@ def sanitize_json_values(
     return sanitized_results
 
 
+# JSON keys whose string values are structural identifiers (call_id, sessionId,
+# parentUuid, tool_use_id, ...), not PII. The model otherwise mislabels these
+# opaque ids as unique_id / device_identifier / customer_id, so their values are
+# kept verbatim and never sent for redaction. Matches a bare `id`/`uuid`, a
+# snake_case `*_id`/`*_uuid` suffix, and camelCase boundaries (`sessionId`,
+# `leafUuid`, `...UUID`) — without catching words like `valid` or `android`.
+_PROTECTED_KEY_SNAKE = re.compile(r"(?:^|_)(?:id|uuid)$", re.IGNORECASE)
+_PROTECTED_KEY_CAMEL = re.compile(r"[a-z0-9](?:Id|Uuid|UUID)$")
+
+
+def _is_protected_key(key: object) -> bool:
+    if not isinstance(key, str):
+        return False
+    return bool(_PROTECTED_KEY_SNAKE.search(key) or _PROTECTED_KEY_CAMEL.search(key))
+
+
 def _collect_string_refs(value: object, strings: list[str], refs: list[int]) -> object:
     if isinstance(value, str):
         index = len(strings)
@@ -135,10 +152,13 @@ def _collect_string_refs(value: object, strings: list[str], refs: list[int]) -> 
         return [_collect_string_refs(item, strings, refs) for item in value]
 
     if isinstance(value, dict):
-        return {
-            key: _collect_string_refs(item, strings, refs)
-            for key, item in value.items()
-        }
+        collected: dict[object, object] = {}
+        for key, item in value.items():
+            if isinstance(item, str) and _is_protected_key(key):
+                collected[key] = item  # identifier value: preserve verbatim
+            else:
+                collected[key] = _collect_string_refs(item, strings, refs)
+        return collected
 
     return value
 

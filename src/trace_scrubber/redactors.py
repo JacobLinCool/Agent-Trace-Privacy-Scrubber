@@ -26,8 +26,8 @@ class RedactionConfig:
     model_enabled: bool = True
     preserve_json_structure: bool = True
     include_report: bool = True
-    chunk_size: int = 6000
-    model_batch_size: int = 32
+    chunk_size: int = 3000
+    model_batch_size: int = 16
     confidence_threshold: float = 0.5
     seed: int = 2026
 
@@ -419,6 +419,10 @@ class OpenMedPIIRedactor:
                 continue
             if confidence < config.confidence_threshold:
                 continue
+            if _is_structural_token(chunk[start:end]):
+                # Protocol vocabulary like "assistant"/"response_item" is never
+                # PII even when the model labels it (e.g. occupation).
+                continue
             label = _normalize_label(str(getattr(entity, "label", "pii")))
             spans.append(
                 EntitySpan(
@@ -564,6 +568,83 @@ class OpenMedPIIRedactor:
                 pass
 
 
+class CachingPIIRedactor:
+    """Wrap a model redactor with a whole-string result cache.
+
+    Agent traces repeat the same short structural strings (``"role"``,
+    ``"function_call"``, ISO timestamps, ids, ...) thousands of times. For a
+    fixed run config the model output for a given input string is deterministic,
+    so each distinct value only needs to reach the underlying (often remote)
+    model once. Duplicates are served from the cache, which both cuts model work
+    and shrinks the number of network round-trips for the Modal backend.
+
+    Cached results are treated as read-only values by callers; the same object
+    may be returned for several positions, so downstream code must not mutate it.
+    """
+
+    def __init__(
+        self,
+        inner: PIIRedactor,
+        *,
+        max_cache_chars: int = 65536,
+    ) -> None:
+        self._inner = inner
+        self._max_cache_chars = max(0, int(max_cache_chars))
+        self._cache: dict[str, TextRedactionResult] = {}
+
+    @property
+    def batch_size(self) -> int:
+        """Expose the inner redactor's batch size for line-level batching."""
+
+        try:
+            return max(1, int(getattr(self._inner, "batch_size", 1)))
+        except (TypeError, ValueError):
+            return 1
+
+    @property
+    def cache_size(self) -> int:
+        return len(self._cache)
+
+    def prepare_model(self, config: RedactionConfig) -> None:
+        self._inner.prepare_model(config)
+
+    def redact(self, text: str, config: RedactionConfig) -> TextRedactionResult:
+        return self.redact_many([text], config)[0]
+
+    def redact_many(
+        self, texts: list[str], config: RedactionConfig
+    ) -> list[TextRedactionResult]:
+        if not texts:
+            return []
+
+        # Collect the distinct strings that are neither cached nor already queued.
+        pending: list[str] = []
+        queued: set[str] = set()
+        for text in texts:
+            if text in self._cache or text in queued:
+                continue
+            queued.add(text)
+            pending.append(text)
+
+        fresh: dict[str, TextRedactionResult] = {}
+        if pending:
+            computed = self._inner.redact_many(pending, config)
+            if len(computed) != len(pending):
+                raise ModelRedactionError(
+                    "Cached redactor received an unexpected batch length."
+                )
+            for key, result in zip(pending, computed):
+                fresh[key] = result
+                if len(key) <= self._max_cache_chars:
+                    self._cache[key] = result
+
+        return [self._cache.get(text, None) or fresh[text] for text in texts]
+
+    def release(self) -> None:
+        self._cache.clear()
+        self._inner.release()
+
+
 def sanitize_text(
     text: str,
     config: RedactionConfig,
@@ -632,6 +713,42 @@ def _stable_hash(value: str, label: str, seed: int) -> str:
 def _normalize_label(label: str) -> str:
     normalized = re.sub(r"[^a-zA-Z0-9]+", "_", label.strip().lower()).strip("_")
     return normalized or "pii"
+
+
+# Structural agent-trace vocabulary: message roles, item/event/tool-call types,
+# JSON-schema type words, and status / reasoning-effort enums. These are protocol
+# tokens, never PII, but the model sometimes labels them (e.g. "assistant" as an
+# occupation). A model span is dropped when its whole text equals one of these.
+STRUCTURAL_TOKENS: frozenset[str] = frozenset(
+    {
+        # message roles
+        "user", "assistant", "system", "tool", "developer", "model",
+        "function", "human", "ai",
+        # item / event / tool-call types
+        "message", "agent_message", "response_item", "event_msg",
+        "function_call", "function_call_output",
+        "custom_tool_call", "custom_tool_call_output",
+        "tool_call", "tool_calls", "tool_result", "tool_use",
+        "local_shell_call", "web_search_call",
+        "exec_command", "exec_command_output",
+        "apply_patch", "patch_apply_begin", "patch_apply_end",
+        "reasoning", "commentary", "input_text", "output_text",
+        "final_answer", "turn_context", "write_stdin", "open_page",
+        "read_thread_terminal",
+        # content / JSON-schema types
+        "string", "object", "number", "boolean", "integer", "array", "null",
+        "text", "json", "token_count", "type",
+        # status enums
+        "completed", "in_progress", "failed", "success", "error",
+        "cancelled", "disabled", "enabled", "update", "default", "none",
+        # reasoning-effort levels
+        "minimal", "low", "medium", "high", "xhigh", "max",
+    }
+)
+
+
+def _is_structural_token(text: str) -> bool:
+    return text.strip().lower() in STRUCTURAL_TOKENS
 
 
 def _is_placeholder(value: str) -> bool:

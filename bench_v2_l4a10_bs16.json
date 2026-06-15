@@ -1,0 +1,53 @@
+{
+  "config": {
+    "n_synthetic": 1000,
+    "real_lines": 200,
+    "real_unique": 502,
+    "batch_sizes": [
+      16
+    ],
+    "seed": 2026
+  },
+  "results": {
+    "L4": {
+      "gpu_name": "NVIDIA L4",
+      "model_load_s": 12.16,
+      "part_a": [
+        {
+          "batch_size": 16,
+          "chunks_per_s": 11.46
+        }
+      ],
+      "part_b": {
+        "batch_size": 16,
+        "total_leaves": 1394,
+        "unique_leaves": 502,
+        "old_strings_per_s": 20.5,
+        "new_strings_per_s": 35.4,
+        "old_s": 67.98,
+        "new_s": 39.41,
+        "cache_speedup": 1.73
+      }
+    },
+    "A10": {
+      "gpu_name": "NVIDIA A10",
+      "model_load_s": 8.54,
+      "part_a": [
+        {
+          "batch_size": 16,
+          "chunks_per_s": 16.98
+        }
+      ],
+      "part_b": {
+        "batch_size": 16,
+        "total_leaves": 1394,
+        "unique_leaves": 502,
+        "old_strings_per_s": 33.0,
+        "new_strings_per_s": 58.3,
+        "old_s": 42.18,
+        "new_s": 23.91,
+        "cache_speedup": 1.76
+      }
+    }
+  }
+}

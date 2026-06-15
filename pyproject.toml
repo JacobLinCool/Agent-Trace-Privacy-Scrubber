@@ -19,3 +19,9 @@ dependencies = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# app.py inserts src/ onto sys.path before importing the local package so it runs
+# on a Hugging Face Space without the package being installed; its local imports
+# intentionally sit below that module-level setup.
+"app.py" = ["E402"]

@@ -43,7 +43,11 @@ _cache_committed = False
 
 @app.function(
     image=image,
-    gpu=["L4", "A10G"],
+    # RTX PRO 6000 (Blackwell, 96GB) is the default: fastest in our benchmark and
+    # near-cheapest per chunk, and its memory comfortably fits model batch 64 plus
+    # multi-MB strings. H100 is a fallback for capacity. See README "Hardware
+    # benchmark" for the numbers behind this choice.
+    gpu=["RTX-PRO-6000", "H100"],
     timeout=1800,
     volumes={MODEL_CACHE_PATH: model_cache},
     env={

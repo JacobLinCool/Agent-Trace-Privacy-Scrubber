@@ -1,0 +1,161 @@
+{
+  "config": {
+    "n_synthetic": 1000,
+    "real_lines": 200,
+    "real_unique": 502,
+    "batch_sizes": [
+      16,
+      32,
+      64
+    ],
+    "seed": 2026
+  },
+  "results": {
+    "L4": {
+      "error": "ExecutionError('Could not deserialize remote exception due to local error:\\nDeserialization failed because the \\'trace_scrubber\\' module is not available in the local environment.\\nThis can happen if your local environment does not have the remote exception definitions.\\nHere is the remote traceback:\\nTraceback (most recent call last):\\n  File \"/root/src/trace_scrubber/redactors.py\", line 374, in _extract_chunk_results\\n    results = self._extract_pii_batch(\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/openmed/core/pii.py\", line 474, in _extract_pii_batch\\n    raw_outputs = pipeline(inference_texts, **privacy_call_kwargs)\\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/openmed/torch/privacy_filter.py\", line 192, in __call__\\n    raw_batch = self._pipeline(non_empty, **call_kwargs)\\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/token_classification.py\", line 244, in __call__\\n    return super().__call__(inputs, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/base.py\", line 1257, in __call__\\n    outputs = list(final_iterator)\\n              ^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/pt_utils.py\", line 126, in __next__\\n    item = next(self.iterator)\\n           ^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/pt_utils.py\", line 271, in __next__\\n    processed = self.infer(next(self.iterator), **self.params)\\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/base.py\", line 1175, in forward\\n    model_outputs = self._forward(model_inputs, **forward_params)\\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/token_classification.py\", line 311, in _forward\\n    output = self.model(**model_inputs)\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\\n    return self._call_impl(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\\n    return forward_call(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/utils/generic.py\", line 907, in wrapper\\n    output = func(self, *args, **kwargs)\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/modeling_layers.py\", line 266, in forward\\n    outputs: BaseModelOutputWithPast = getattr(self, self.base_model_prefix)(\\n                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\\n    return self._call_impl(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\\n    return forward_call(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/utils/generic.py\", line 1036, in wrapper\\n    output = func(self, *args, **kwargs)\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/utils/output_capturing.py\", line 252, in wrapper\\n    outputs = func(self, *args, **kwargs)\\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py\", line 492, in forward\\n    hidden_states = encoder_layer(\\n                    ^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/modeling_layers.py\", line 93, in __call__\\n    return super().__call__(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\\n    return self._call_impl(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\\n    return forward_call(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py\", line 385, in forward\\n    hidden_states, _ = self.self_attn(\\n                       ^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\\n    return self._call_impl(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\\n    return forward_call(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py\", line 249, in forward\\n    attn_output, attn_weights = attention_interface(\\n                                ^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py\", line 191, in eager_attention_forward\\n    attn_weights = nn.functional.dropout(scores, p=dropout, training=module.training).to(value_states.dtype)\\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.37 GiB. GPU 0 has a total capacity of 22.03 GiB of which 37.12 MiB is free. Process 1 has 21.99 GiB memory in use. Of the allocated memory 20.21 GiB is allocated by PyTorch, and 1.55 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)\\n\\nThe above exception was the direct cause of the following exception:\\n\\nTraceback (most recent call last):\\n  File \"/pkg/modal/_runtime/container_io_manager.py\", line 915, in handle_input_exception\\n    yield\\n  File \"/pkg/modal/_container_entrypoint.py\", line 189, in run_input_sync\\n    values = io_context.call_function_sync()\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/pkg/modal/_runtime/container_io_manager.py\", line 218, in call_function_sync\\n    expected_value_or_values = self.finalized_function.callable(*args, **kwargs)\\n                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/root/bench_modal_v2.py\", line 185, in benchmark_v2\\n    base.redact_many(real_leaves, cfg(bs_mid))\\n  File \"/root/src/trace_scrubber/redactors.py\", line 292, in redact_many\\n    spans_by_text = self._extract_spans_many(populated_texts, config)\\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/root/src/trace_scrubber/redactors.py\", line 342, in _extract_spans_many\\n    results = self._extract_chunk_results(chunk_refs, config)\\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/root/src/trace_scrubber/redactors.py\", line 393, in _extract_chunk_results\\n    raise ModelRedactionError(\\ntrace_scrubber.redactors.ModelRedactionError: Local OpenMed model redaction failed. Verify the selected model, install extras with `openmed[hf]` or `openmed[mlx]`, and ensure the machine has enough memory for the model.\\n')"
+    },
+    "A10": {
+      "error": "ExecutionError('Could not deserialize remote exception due to local error:\\nDeserialization failed because the \\'trace_scrubber\\' module is not available in the local environment.\\nThis can happen if your local environment does not have the remote exception definitions.\\nHere is the remote traceback:\\nTraceback (most recent call last):\\n  File \"/root/src/trace_scrubber/redactors.py\", line 374, in _extract_chunk_results\\n    results = self._extract_pii_batch(\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/openmed/core/pii.py\", line 474, in _extract_pii_batch\\n    raw_outputs = pipeline(inference_texts, **privacy_call_kwargs)\\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/openmed/torch/privacy_filter.py\", line 192, in __call__\\n    raw_batch = self._pipeline(non_empty, **call_kwargs)\\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/token_classification.py\", line 244, in __call__\\n    return super().__call__(inputs, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/base.py\", line 1257, in __call__\\n    outputs = list(final_iterator)\\n              ^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/pt_utils.py\", line 126, in __next__\\n    item = next(self.iterator)\\n           ^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/pt_utils.py\", line 271, in __next__\\n    processed = self.infer(next(self.iterator), **self.params)\\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/base.py\", line 1175, in forward\\n    model_outputs = self._forward(model_inputs, **forward_params)\\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/pipelines/token_classification.py\", line 311, in _forward\\n    output = self.model(**model_inputs)\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\\n    return self._call_impl(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\\n    return forward_call(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/utils/generic.py\", line 907, in wrapper\\n    output = func(self, *args, **kwargs)\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/modeling_layers.py\", line 266, in forward\\n    outputs: BaseModelOutputWithPast = getattr(self, self.base_model_prefix)(\\n                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\\n    return self._call_impl(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\\n    return forward_call(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/utils/generic.py\", line 1036, in wrapper\\n    output = func(self, *args, **kwargs)\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/utils/output_capturing.py\", line 252, in wrapper\\n    outputs = func(self, *args, **kwargs)\\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py\", line 492, in forward\\n    hidden_states = encoder_layer(\\n                    ^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/modeling_layers.py\", line 93, in __call__\\n    return super().__call__(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\\n    return self._call_impl(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\\n    return forward_call(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py\", line 385, in forward\\n    hidden_states, _ = self.self_attn(\\n                       ^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\\n    return self._call_impl(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\\n    return forward_call(*args, **kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py\", line 249, in forward\\n    attn_output, attn_weights = attention_interface(\\n                                ^^^^^^^^^^^^^^^^^^^^\\n  File \"/usr/local/lib/python3.12/site-packages/transformers/models/openai_privacy_filter/modeling_openai_privacy_filter.py\", line 191, in eager_attention_forward\\n    attn_weights = nn.functional.dropout(scores, p=dropout, training=module.training).to(value_states.dtype)\\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.37 GiB. GPU 0 has a total capacity of 22.06 GiB of which 11.44 MiB is free. Process 1 has 22.04 GiB memory in use. Of the allocated memory 20.21 GiB is allocated by PyTorch, and 1.55 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)\\n\\nThe above exception was the direct cause of the following exception:\\n\\nTraceback (most recent call last):\\n  File \"/pkg/modal/_runtime/container_io_manager.py\", line 915, in handle_input_exception\\n    yield\\n  File \"/pkg/modal/_container_entrypoint.py\", line 189, in run_input_sync\\n    values = io_context.call_function_sync()\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/pkg/modal/_runtime/container_io_manager.py\", line 218, in call_function_sync\\n    expected_value_or_values = self.finalized_function.callable(*args, **kwargs)\\n                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/root/bench_modal_v2.py\", line 185, in benchmark_v2\\n    base.redact_many(real_leaves, cfg(bs_mid))\\n  File \"/root/src/trace_scrubber/redactors.py\", line 292, in redact_many\\n    spans_by_text = self._extract_spans_many(populated_texts, config)\\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/root/src/trace_scrubber/redactors.py\", line 342, in _extract_spans_many\\n    results = self._extract_chunk_results(chunk_refs, config)\\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/root/src/trace_scrubber/redactors.py\", line 393, in _extract_chunk_results\\n    raise ModelRedactionError(\\ntrace_scrubber.redactors.ModelRedactionError: Local OpenMed model redaction failed. Verify the selected model, install extras with `openmed[hf]` or `openmed[mlx]`, and ensure the machine has enough memory for the model.\\n')"
+    },
+    "L40S": {
+      "gpu_name": "NVIDIA L40S",
+      "model_load_s": 8.49,
+      "part_a": [
+        {
+          "batch_size": 16,
+          "chunks_per_s": 19.91
+        },
+        {
+          "batch_size": 32,
+          "chunks_per_s": 23.58
+        },
+        {
+          "batch_size": 64,
+          "chunks_per_s": 25.46
+        }
+      ],
+      "part_b": {
+        "batch_size": 32,
+        "total_leaves": 1394,
+        "unique_leaves": 502,
+        "old_strings_per_s": 37.7,
+        "new_strings_per_s": 71.4,
+        "old_s": 37.02,
+        "new_s": 19.52,
+        "cache_speedup": 1.9
+      }
+    },
+    "A100-40GB": {
+      "gpu_name": "NVIDIA A100-SXM4-40GB",
+      "model_load_s": 11.03,
+      "part_a": [
+        {
+          "batch_size": 16,
+          "chunks_per_s": 19.18
+        },
+        {
+          "batch_size": 32,
+          "chunks_per_s": 23.24
+        },
+        {
+          "batch_size": 64,
+          "chunks_per_s": 26.18
+        }
+      ],
+      "part_b": {
+        "batch_size": 32,
+        "total_leaves": 1394,
+        "unique_leaves": 502,
+        "old_strings_per_s": 41.3,
+        "new_strings_per_s": 82.5,
+        "old_s": 33.79,
+        "new_s": 16.9,
+        "cache_speedup": 2.0
+      }
+    },
+    "A100-80GB": {
+      "gpu_name": "NVIDIA A100-SXM4-80GB",
+      "model_load_s": 13.74,
+      "part_a": [
+        {
+          "batch_size": 16,
+          "chunks_per_s": 14.48
+        },
+        {
+          "batch_size": 32,
+          "chunks_per_s": 17.66
+        },
+        {
+          "batch_size": 64,
+          "chunks_per_s": 19.6
+        }
+      ],
+      "part_b": {
+        "batch_size": 32,
+        "total_leaves": 1394,
+        "unique_leaves": 502,
+        "old_strings_per_s": 36.6,
+        "new_strings_per_s": 72.8,
+        "old_s": 38.12,
+        "new_s": 19.14,
+        "cache_speedup": 1.99
+      }
+    },
+    "RTX-PRO-6000": {
+      "gpu_name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+      "model_load_s": 6.55,
+      "part_a": [
+        {
+          "batch_size": 16,
+          "chunks_per_s": 38.74
+        },
+        {
+          "batch_size": 32,
+          "chunks_per_s": 46.45
+        },
+        {
+          "batch_size": 64,
+          "chunks_per_s": 50.95
+        }
+      ],
+      "part_b": {
+        "batch_size": 32,
+        "total_leaves": 1394,
+        "unique_leaves": 502,
+        "old_strings_per_s": 81.7,
+        "new_strings_per_s": 150.4,
+        "old_s": 17.06,
+        "new_s": 9.27,
+        "cache_speedup": 1.84
+      }
+    },
+    "H100": {
+      "gpu_name": "NVIDIA H100 80GB HBM3",
+      "model_load_s": 8.66,
+      "part_a": [
+        {
+          "batch_size": 16,
+          "chunks_per_s": 31.28
+        },
+        {
+          "batch_size": 32,
+          "chunks_per_s": 36.56
+        },
+        {
+          "batch_size": 64,
+          "chunks_per_s": 42.3
+        }
+      ],
+      "part_b": {
+        "batch_size": 32,
+        "total_leaves": 1394,
+        "unique_leaves": 502,
+        "old_strings_per_s": 77.9,
+        "new_strings_per_s": 151.7,
+        "old_s": 17.89,
+        "new_s": 9.19,
+        "cache_speedup": 1.95
+      }
+    }
+  }
+}

@@ -1,79 +1,62 @@
-# Agent Trace Privacy Scrubber: Cleaning Agent Logs Before They Leave Your Machine
+# Local Privacy Filtering for Shareable Agent Traces
 
-Agent Trace Privacy Scrubber is a small Gradio app for a problem that appears right after an agent becomes useful: the trace is worth sharing, but the trace may also be private.
+The Build Small Hackathon surfaced a practical tension in agentic development: the most useful traces are also the most sensitive. Near the submission deadline, after finishing several projects, I reviewed the bonus badges and found Sharing is Caring, which encourages builders to publish traces from Codex, Claude Code, Pi Agent, and similar systems as [Hugging Face Datasets](https://huggingface.co/datasets). The premise is strong. Agent traces can show how a project was built with far more fidelity than a final demo or README.
 
-Codex, Claude Code, Pi Agent, and similar tools leave behind JSONL logs that are excellent for debugging and learning. They show prompts, plans, tool calls, shell output, failures, and recovery steps. In a hackathon, that kind of trace can help other builders understand what happened. In an open-source issue, it can make a bug reproducible.
+A trace records the working process: prompts, plans, agent actions, files read, commands executed, errors encountered, and recovery steps. For other builders, this record can make agentic development more reproducible and easier to learn from. It shows collaboration with the agent as an empirical artifact in place of a polished retrospective.
 
-But raw traces are not polished logs. They can include local paths, pasted secrets, command output, email addresses, private repository snippets, bearer tokens, `.env` values, or a screenshot reference that should never become public. The safest choice is often not to share them at all, which means losing a useful artifact.
+That same fidelity creates the privacy problem. Session logs can contain local paths, private repository fragments, environment variables, API keys, bearer tokens, emails, project names, customer context, and personal data pasted into a prompt. They can also expose implementation context that has no obvious secret shape yet remains unsuitable for publication. A raw trace is therefore both a valuable learning artifact and a high-risk release artifact.
 
-This project takes a deliberately narrow middle path: make it easy for a builder to sanitize agent traces locally, inspect what changed, and only then decide whether to share the result.
+Agent Trace Privacy Scrubber addresses the missing step between local agent use and public trace sharing: a local privacy pass before the trace leaves the builder's control.
 
-## The App
+Demo video: https://youtu.be/Go2AcwcE72M
 
-The workflow is built around a single workbench:
+## Why Local Inference Matters
 
-1. Pick a source: known local agent folders, a custom path, uploaded files, an uploaded directory, or bundled fake sample logs.
-2. Scan JSONL, NDJSON, and JSON traces.
-3. Select the files to process.
-4. Choose a redaction policy.
-5. Run deterministic secret redaction and optional model PII detection.
-6. Download a sanitized archive with a redaction report.
+The hackathon's small-model constraint raised a broader design question for me: where does a local small model provide a capability that is distinct from hosted frontier inference?
 
-The app never overwrites the original files. The output zip contains sanitized traces, `redaction_report.json`, and `README_FIRST.txt`, so the user has a review step before publishing anything.
+Many AI tasks can be handled well by cloud APIs. Frontier models are often stronger, faster, and operationally easier than local models, especially when credits or reasonable pricing are available. Agent trace redaction has a different constraint. The raw input may contain the exact secrets and private context that redaction is meant to remove, so the redaction step should happen before any upload or remote inference call.
 
-## Technical Implementation
+In this setting, locality is a privacy boundary. The model's value comes from where it runs: on the builder's machine, before dataset publication, bug-report attachment, or team sharing. A small local model becomes useful because it can operate at the point where disclosure risk is highest.
 
-The main app is a Gradio Blocks interface in `app.py`. The core logic is split into small modules:
+## System Scope
 
-- `discovery.py` finds trace files and prepares table rows.
-- `jsonl_processor.py` streams JSONL/NDJSON/JSON and preserves structure where possible.
-- `redactors.py` runs deterministic secret rules and optional OpenMed PII redaction.
-- `modal_backend.py` delegates model inference to a Modal function when the user opts in.
-- `reporting.py` and `zipper.py` build preview rows and downloadable archives.
+Agent Trace Privacy Scrubber is a local-first Gradio application for sanitizing agent session logs. The app supports common local sources such as Codex sessions at `~/.codex/sessions`, Claude Code projects at `~/.claude/projects`, and Pi Agent sessions at `~/.pi/agent/sessions`. It also accepts custom folders, uploaded files, uploaded directories, and bundled fake sample logs for public demonstration.
 
-The deterministic pass catches common high-risk patterns: OpenAI-style keys, Anthropic keys, Hugging Face tokens, GitHub tokens, Slack tokens, JWTs, bearer tokens, AWS-looking credentials, private-key blocks, `.env` assignments, credentialed URLs, and token-bearing query parameters.
+The workflow is intentionally narrow. The user scans a source, reviews the discovered JSONL, NDJSON, or JSON traces, selects the files to process, chooses a redaction mode, and downloads a sanitized archive. The archive contains the processed traces, `redaction_report.json`, and `README_FIRST.txt`. Source logs remain unchanged.
 
-For model redaction, the app uses `OpenMed/privacy-filter-nemotron`, a small token-classification model for PII spans. Apple Silicon users can choose the MLX sibling. The default backend runs in the current Python process. On a local laptop, that is local compute; on the public Space, that is the Space runtime. Modal is available as an explicit remote GPU backend, but the UI calls out that boundary before the user sends anything.
+This scope keeps the application focused on the pre-publication privacy boundary. Dataset publication, trace viewing, and safety certification remain outside this scope. The application gives builders a structured first pass before human review.
 
-## Build Small Fit
+## Redaction Method
 
-This is a Backyard AI project: practical, focused, and built for a real workflow. The target user is not an abstract enterprise buyer. It is a person who just finished an agentic coding session and wants to share the useful parts without exposing the private parts.
+The scrubber combines deterministic secret detection with optional model-based PII detection.
 
-It also fits several Build Small quests:
+The deterministic layer handles high-risk credential patterns whose structure is known in advance: OpenAI-style keys, Anthropic keys, Hugging Face tokens, GitHub tokens, Slack tokens, JWTs, bearer tokens, AWS-looking credentials, private-key blocks, credentialed URLs, `.env` assignments, and token-bearing query strings. These cases benefit from explicit rules because a single missed credential can matter more than a graceful model judgment.
 
-- Best Use of Codex: Codex helped implement, review, package, document, and prepare the project, and the connected GitHub commits include Codex co-author trailers.
-- Best Use of Modal: the app includes a deployed Modal backend for optional GPU model inference.
-- Off-Brand / Custom UI: the app uses a custom workbench layout rather than the stock Gradio look.
-- Field Notes: this article and the submission notes document what was built and what tradeoffs remain.
+The model layer uses [`OpenMed/privacy-filter-nemotron`](https://huggingface.co/OpenMed/privacy-filter-nemotron), with the Apple Silicon MLX sibling [`OpenMed/privacy-filter-nemotron-mlx`](https://huggingface.co/OpenMed/privacy-filter-nemotron-mlx) available for local use. The model card describes the checkpoint as a fine-tune of [`openai/privacy-filter`](https://huggingface.co/openai/privacy-filter) on [`nvidia/Nemotron-PII`](https://huggingface.co/datasets/nvidia/Nemotron-PII), with 55 fine-grained PII categories. This specialized token-classification model fits the task better than a general prompt asking an LLM to identify sensitive text: the task is span-level privacy filtering, and the model is trained for that family of decisions.
 
-The NVIDIA Nemotron sponsor quest is a conditional fit: the model path is built around OpenMed's Nemotron privacy-filter checkpoint and NVIDIA Nemotron-PII data lineage. If judging requires only NVIDIA-published Nemotron 3 family checkpoints, that quest may not apply.
+The processor preserves JSON structure where possible. It parses valid JSON lines, recursively redacts string values, keeps non-string values intact, and records invalid JSON lines as warnings while sanitizing their raw text. This matters because downstream consumers often expect stable JSONL structure.
 
-## Challenges
+## Product Boundaries
 
-The hardest design issue was not the regex list. It was making the privacy boundary visible without turning the UI into a warning page. The app has two compute paths, and they have different trust implications. The current-runtime path keeps processing on the local machine or Space runtime. The Modal path is useful for CUDA inference, but it is remote compute. The interface and README say that directly.
+Local-first privacy also shapes the interface and runtime design.
 
-Another challenge was preserving structure. Agent logs are often consumed by tools that expect one JSON object per line. The processor parses valid JSON lines, redacts string leaves recursively, preserves non-string values, and records invalid lines in the report rather than pretending everything was clean.
+The default backend runs inside the same Python process as the Gradio app. On a local machine, the privacy pass uses local compute. On the public Hugging Face Space, it runs in the Space runtime. The model may download weights from Hugging Face on first use, while trace contents stay out of hosted LLM APIs, analytics, and telemetry.
 
-Finally, the public demo needed to avoid real sensitive data. The Space ships with fake sample traces that look like Codex, Claude Code, and Pi Agent logs but contain only fake credentials and fake personal data.
+The Modal backend is an explicit remote-compute option for CUDA inference. In that path, deterministic redaction runs first, then model-enabled string values are sent to the deployed Modal function. The app presents this as a trust boundary, so users can choose speed and hardware access with a clear understanding of where the data goes.
 
-## How Codex Helped
+The interface also treats progress visibility as part of the privacy workflow. Trace folders can be large, model initialization can take time, and JSONL files are processed line by line. The UI reports the current phase, file index, current file, current line, total progress, ETA, and aggregate redaction counts. For local processing, these signals help users understand that the system is working and what stage it has reached.
 
-Codex helped across the full submission loop:
+The generated report follows the same privacy principle. It records categories, counts, timings, invalid-line warnings, and file-level summaries while omitting raw matched values, so the report remains a summary artifact.
 
-- reviewed the official Build Small requirements and tag format,
-- checked `.gitignore` and repository hygiene,
-- validated tests and app import behavior,
-- deployed the Modal backend,
-- recorded a short sample-log demo video,
-- rewrote the README for the hackathon audience,
-- drafted the article, social post, and submission checklist,
-- and ensured commit history uses `Co-authored-by: Codex <codex@openai.com>`.
+Sharing is Caring supplied the motivating use case, and it clarified the product boundary. Trace sharing is valuable because it exposes the real path of agentic development; trace sharing is risky because that path may include private data. The scrubber lowers the barrier to participation by adding a local review step before dataset release.
 
-The result is intentionally small: one Gradio app, one clear privacy workflow, one downloadable archive, and a story that fits the Build Small theme.
+The scrubber provides a bounded first pass. Automatic redaction can miss project-specific identifiers, unusual credential formats, sensitive code fragments, and contextual information that only the builder can judge. The model is primarily useful for PII spans; deterministic rules are strongest for known secret patterns. Human review remains part of the release process.
+
+That scope defines the application's role. Agent Trace Privacy Scrubber helps builders convert raw traces into reviewable release candidates, while keeping the final publication decision with the person who understands the project context.
+
+For me, this was the strongest lesson from the project: local small models are most compelling when locality is part of the value proposition. Agent trace redaction is one of those cases. The trace is worth sharing, the raw data is sensitive, and the privacy pass belongs on the builder's machine.
 
 ## Links
 
 - Live Space: https://huggingface.co/spaces/build-small-hackathon/agent-trace-privacy-scrubber
 - GitHub: https://github.com/JacobLinCool/Agent-Trace-Privacy-Scrubber
-- Demo video: https://youtu.be/Go2AcwcE72M
-- Submission notes: `docs/submission-notes.md`

@@ -9,7 +9,15 @@ from .redactors import ModelRedactionError, RedactionConfig, TextRedactionResult
 
 MODAL_APP_NAME = "agent-trace-privacy-scrubber"
 MODAL_FUNCTION_NAME = "redact_text_batch"
-DEFAULT_MODAL_BATCH_SIZE = 32
+# Strings sent per remote round-trip. This is the *network request* batch and is
+# intentionally decoupled from ``config.model_batch_size`` (the per-forward-pass
+# GPU batch that bounds device memory): packing many short strings into one call
+# amortizes Modal's per-invocation overhead without enlarging the GPU batch.
+DEFAULT_MODAL_BATCH_SIZE = 256
+# Cap the cumulative characters per round-trip so a few multi-MB strings get
+# their own call instead of bloating one payload (and so a giant string never
+# starves a batch of small ones).
+DEFAULT_REQUEST_MAX_CHARS = 1_000_000
 
 FunctionLookup = Callable[[str, str], Any]
 
@@ -23,11 +31,13 @@ class ModalPIIRedactor:
         app_name: str = MODAL_APP_NAME,
         function_name: str = MODAL_FUNCTION_NAME,
         batch_size: int = DEFAULT_MODAL_BATCH_SIZE,
+        request_max_chars: int = DEFAULT_REQUEST_MAX_CHARS,
         function_lookup: FunctionLookup | None = None,
     ) -> None:
         self.app_name = app_name
         self.function_name = function_name
         self.batch_size = max(1, int(batch_size))
+        self.request_max_chars = max(1, int(request_max_chars))
         self._function_lookup = function_lookup
         self._function: Any | None = None
 
@@ -57,7 +67,7 @@ class ModalPIIRedactor:
         assert self._function is not None
 
         results: list[TextRedactionResult] = []
-        for batch in _batched(texts, self.batch_size):
+        for batch in _batched(texts, self.batch_size, self.request_max_chars):
             try:
                 payload = self._function.remote(batch, _modal_settings(config))
             except Exception as exc:
@@ -142,7 +152,29 @@ def _coerce_count_mapping(value: object) -> dict[str, int]:
     return counts
 
 
-def _batched(items: list[str], batch_size: int) -> list[list[str]]:
-    return [
-        items[index : index + batch_size] for index in range(0, len(items), batch_size)
-    ]
+def _batched(
+    items: list[str], batch_size: int, max_chars: int | None = None
+) -> list[list[str]]:
+    """Group items by count and (optionally) cumulative character budget.
+
+    A single item larger than ``max_chars`` still gets its own batch rather than
+    being dropped, so oversized strings never starve smaller ones.
+    """
+
+    batches: list[list[str]] = []
+    current: list[str] = []
+    current_chars = 0
+    for item in items:
+        item_chars = len(item)
+        if current and (
+            len(current) >= batch_size
+            or (max_chars is not None and current_chars + item_chars > max_chars)
+        ):
+            batches.append(current)
+            current = []
+            current_chars = 0
+        current.append(item)
+        current_chars += item_chars
+    if current:
+        batches.append(current)
+    return batches

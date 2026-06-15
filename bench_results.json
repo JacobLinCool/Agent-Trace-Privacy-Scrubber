@@ -1,0 +1,234 @@
+{
+  "config": {
+    "n_chunks": 1000,
+    "min_len": 1000,
+    "max_len": 3000,
+    "chunk_size": 3000,
+    "seed": 2026,
+    "batch_sizes": [
+      16,
+      32,
+      64
+    ],
+    "total_chars": 2035647
+  },
+  "results": {
+    "L4": {
+      "gpu_name": "NVIDIA L4",
+      "n_chunks": 1000,
+      "total_chars": 2035647,
+      "mean_chars": 2035.6,
+      "model_load_seconds": 11.74,
+      "pii_spans_found": 143948,
+      "runs": [
+        {
+          "batch_size": 16,
+          "elapsed_s": 72.8095,
+          "chunks_per_s": 13.73,
+          "chars_per_s": 27958.6,
+          "peak_gpu_mem_gb": 5.49
+        },
+        {
+          "batch_size": 32,
+          "elapsed_s": 67.1715,
+          "chunks_per_s": 14.89,
+          "chars_per_s": 30305.2,
+          "peak_gpu_mem_gb": 8.17
+        },
+        {
+          "batch_size": 64,
+          "elapsed_s": 65.5693,
+          "chunks_per_s": 15.25,
+          "chars_per_s": 31045.7,
+          "peak_gpu_mem_gb": 13.53
+        }
+      ]
+    },
+    "A10": {
+      "gpu_name": "NVIDIA A10",
+      "n_chunks": 1000,
+      "total_chars": 2035647,
+      "mean_chars": 2035.6,
+      "model_load_seconds": 9.92,
+      "pii_spans_found": 143962,
+      "runs": [
+        {
+          "batch_size": 16,
+          "elapsed_s": 61.4158,
+          "chunks_per_s": 16.28,
+          "chars_per_s": 33145.3,
+          "peak_gpu_mem_gb": 5.49
+        },
+        {
+          "batch_size": 32,
+          "elapsed_s": 54.5736,
+          "chunks_per_s": 18.32,
+          "chars_per_s": 37301.0,
+          "peak_gpu_mem_gb": 8.17
+        },
+        {
+          "batch_size": 64,
+          "elapsed_s": 51.3624,
+          "chunks_per_s": 19.47,
+          "chars_per_s": 39633.0,
+          "peak_gpu_mem_gb": 13.53
+        }
+      ]
+    },
+    "L40S": {
+      "gpu_name": "NVIDIA L40S",
+      "n_chunks": 1000,
+      "total_chars": 2035647,
+      "mean_chars": 2035.6,
+      "model_load_seconds": 8.55,
+      "pii_spans_found": 143959,
+      "runs": [
+        {
+          "batch_size": 16,
+          "elapsed_s": 50.5511,
+          "chunks_per_s": 19.78,
+          "chars_per_s": 40269.1,
+          "peak_gpu_mem_gb": 5.49
+        },
+        {
+          "batch_size": 32,
+          "elapsed_s": 44.9702,
+          "chunks_per_s": 22.24,
+          "chars_per_s": 45266.5,
+          "peak_gpu_mem_gb": 8.17
+        },
+        {
+          "batch_size": 64,
+          "elapsed_s": 39.4165,
+          "chunks_per_s": 25.37,
+          "chars_per_s": 51644.5,
+          "peak_gpu_mem_gb": 13.53
+        }
+      ]
+    },
+    "A100-40GB": {
+      "gpu_name": "NVIDIA A100-SXM4-40GB",
+      "n_chunks": 1000,
+      "total_chars": 2035647,
+      "mean_chars": 2035.6,
+      "model_load_seconds": 10.04,
+      "pii_spans_found": 143921,
+      "runs": [
+        {
+          "batch_size": 16,
+          "elapsed_s": 52.1093,
+          "chunks_per_s": 19.19,
+          "chars_per_s": 39065.0,
+          "peak_gpu_mem_gb": 5.49
+        },
+        {
+          "batch_size": 32,
+          "elapsed_s": 43.1081,
+          "chunks_per_s": 23.2,
+          "chars_per_s": 47221.9,
+          "peak_gpu_mem_gb": 8.17
+        },
+        {
+          "batch_size": 64,
+          "elapsed_s": 38.8628,
+          "chunks_per_s": 25.73,
+          "chars_per_s": 52380.3,
+          "peak_gpu_mem_gb": 13.53
+        }
+      ]
+    },
+    "A100-80GB": {
+      "gpu_name": "NVIDIA A100-SXM4-80GB",
+      "n_chunks": 1000,
+      "total_chars": 2035647,
+      "mean_chars": 2035.6,
+      "model_load_seconds": 12.66,
+      "pii_spans_found": 143921,
+      "runs": [
+        {
+          "batch_size": 16,
+          "elapsed_s": 70.595,
+          "chunks_per_s": 14.17,
+          "chars_per_s": 28835.6,
+          "peak_gpu_mem_gb": 5.49
+        },
+        {
+          "batch_size": 32,
+          "elapsed_s": 58.7293,
+          "chunks_per_s": 17.03,
+          "chars_per_s": 34661.5,
+          "peak_gpu_mem_gb": 8.17
+        },
+        {
+          "batch_size": 64,
+          "elapsed_s": 53.4655,
+          "chunks_per_s": 18.7,
+          "chars_per_s": 38074.0,
+          "peak_gpu_mem_gb": 13.53
+        }
+      ]
+    },
+    "RTX-PRO-6000": {
+      "gpu_name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+      "n_chunks": 1000,
+      "total_chars": 2035647,
+      "mean_chars": 2035.6,
+      "model_load_seconds": 8.36,
+      "pii_spans_found": 143939,
+      "runs": [
+        {
+          "batch_size": 16,
+          "elapsed_s": 29.3831,
+          "chunks_per_s": 34.03,
+          "chars_per_s": 69279.5,
+          "peak_gpu_mem_gb": 5.51
+        },
+        {
+          "batch_size": 32,
+          "elapsed_s": 24.7581,
+          "chunks_per_s": 40.39,
+          "chars_per_s": 82221.5,
+          "peak_gpu_mem_gb": 8.19
+        },
+        {
+          "batch_size": 64,
+          "elapsed_s": 22.5836,
+          "chunks_per_s": 44.28,
+          "chars_per_s": 90138.3,
+          "peak_gpu_mem_gb": 13.56
+        }
+      ]
+    },
+    "H100": {
+      "gpu_name": "NVIDIA H100 80GB HBM3",
+      "n_chunks": 1000,
+      "total_chars": 2035647,
+      "mean_chars": 2035.6,
+      "model_load_seconds": 22.65,
+      "pii_spans_found": 143902,
+      "runs": [
+        {
+          "batch_size": 16,
+          "elapsed_s": 32.3537,
+          "chunks_per_s": 30.91,
+          "chars_per_s": 62918.6,
+          "peak_gpu_mem_gb": 5.51
+        },
+        {
+          "batch_size": 32,
+          "elapsed_s": 26.1592,
+          "chunks_per_s": 38.23,
+          "chars_per_s": 77817.8,
+          "peak_gpu_mem_gb": 8.19
+        },
+        {
+          "batch_size": 64,
+          "elapsed_s": 23.4494,
+          "chunks_per_s": 42.65,
+          "chars_per_s": 86810.3,
+          "peak_gpu_mem_gb": 13.56
+        }
+      ]
+    }
+  }
+}

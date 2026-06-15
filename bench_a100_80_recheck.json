@@ -1,0 +1,48 @@
+{
+  "config": {
+    "n_chunks": 1000,
+    "min_len": 1000,
+    "max_len": 3000,
+    "chunk_size": 3000,
+    "seed": 2026,
+    "batch_sizes": [
+      16,
+      32,
+      64
+    ],
+    "total_chars": 2035647
+  },
+  "results": {
+    "A100-80GB": {
+      "gpu_name": "NVIDIA A100-SXM4-80GB",
+      "n_chunks": 1000,
+      "total_chars": 2035647,
+      "mean_chars": 2035.6,
+      "model_load_seconds": 15.48,
+      "pii_spans_found": 143921,
+      "runs": [
+        {
+          "batch_size": 16,
+          "elapsed_s": 73.8653,
+          "chunks_per_s": 13.54,
+          "chars_per_s": 27558.9,
+          "peak_gpu_mem_gb": 5.49
+        },
+        {
+          "batch_size": 32,
+          "elapsed_s": 58.6755,
+          "chunks_per_s": 17.04,
+          "chars_per_s": 34693.3,
+          "peak_gpu_mem_gb": 8.17
+        },
+        {
+          "batch_size": 64,
+          "elapsed_s": 52.417,
+          "chunks_per_s": 19.08,
+          "chars_per_s": 38835.6,
+          "peak_gpu_mem_gb": 13.53
+        }
+      ]
+    }
+  }
+}
