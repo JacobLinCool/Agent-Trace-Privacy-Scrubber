@@ -129,6 +129,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -181,4 +183,5 @@ cython_debug/
 .cursorindexingignore
 
 .DS_Store
-artifacts
+artifacts/
+output/
