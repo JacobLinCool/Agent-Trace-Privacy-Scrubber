@@ -18,7 +18,7 @@ Agent Trace Privacy Scrubber is a local-first Gradio workbench for sanitizing JS
 | Stay under 32B parameters | Complete | `OpenMed/privacy-filter-nemotron` is listed as a 1B token-classification model on Hugging Face. The app does not depend on any model above 32B. |
 | Ship a Gradio app in the official org | Complete after Space push | README front matter sets `sdk: gradio`, `app_file: app.py`, and the target Space is `build-small-hackathon/agent-trace-privacy-scrubber`. |
 | Record a demo video | Complete | YouTube demo: https://youtu.be/Go2AcwcE72M. Repository copy: `docs/demo-agent-trace-privacy-scrubber.mp4`. |
-| Post one social-media post | Human action required | Draft is in `docs/social-post.md`. It has not been posted because the user explicitly requested drafts only. |
+| Post one social-media post | Complete | Published X post: https://x.com/JacobLinCool/status/2066455131189850204. Draft text is preserved in `docs/social-post.md`. |
 | Mind ZeroGPU limit | Complete | This is one ZeroGPU-compatible Gradio Space. Modal is optional remote compute. |
 | Tag README for tracks/prizes/badges | Complete | README uses official `track:*`, `sponsor:*`, and `achievement:*` tag formats discovered from the submission app. |
 | Add short write-up of idea and tech | Complete | README and `docs/article.md` explain problem, user, workflow, architecture, model, Modal, and Codex contribution. |
@@ -37,9 +37,9 @@ Agent Trace Privacy Scrubber is a local-first Gradio workbench for sanitizing JS
 | Best Use of Modal | Yes | Ready | `modal_app.py` deploys an opt-in CUDA redaction backend, and README documents Modal use. Tag: `sponsor:modal`. |
 | Off-Brand / Custom UI | Yes | Ready | The app uses custom Gradio CSS and a workbench layout beyond default components. Tag: `achievement:offbrand`. |
 | Tiny Titan | Possible but not targeted | Not tagged | The model is small enough, but the submission story is about privacy workflow, not smallest-weight impact. |
-| Best Demo | Partially ready | Demo done; X post pending | YouTube demo exists. Public X post still requires human publishing. |
+| Best Demo | Ready | Demo and X post published | YouTube demo and public X post are both available. |
 | Best Agent | No | Not targeted | The app processes agent artifacts but is not itself a multi-step agentic app. |
-| Bonus Quest Champion | Possible | Depends on final social post and judge interpretation | Current strongest achievements are Off-Brand and Field Notes. |
+| Bonus Quest Champion | Possible | Depends on judge interpretation | Current strongest achievements are Off-Brand and Field Notes; demo and X post are now complete. |
 | Field Notes achievement | Yes | Ready | `docs/article.md` and this file document the build. Tag: `achievement:fieldnotes`. |
 | Off the Grid achievement | Not tagged | Not targeted | The app is local-first and does not call hosted LLM APIs by default, but optional Modal is a remote backend, so this is not claimed. |
 | Well-Tuned achievement | No | Not targeted | The project uses an existing model and did not publish a new fine-tune. |
@@ -52,13 +52,12 @@ Agent Trace Privacy Scrubber is a local-first Gradio workbench for sanitizing JS
 - Modal deployment: https://modal.com/apps/jacoblincool/main/deployed/agent-trace-privacy-scrubber
 - GitHub repository: https://github.com/JacobLinCool/Agent-Trace-Privacy-Scrubber
 - Demo video: https://youtu.be/Go2AcwcE72M
+- Social post: https://x.com/JacobLinCool/status/2066455131189850204
 - Demo video in repo/Space: `docs/demo-agent-trace-privacy-scrubber.mp4`
 
 ## Manual Actions Remaining
 
-1. Publish the short X post from `docs/social-post.md`.
-2. Replace the pending social-post note in README with the public social URL.
-3. Submit the Space URL, GitHub URL, demo URL, social URL, and summary through the Build Small submission form.
+1. Submit the Space URL, GitHub URL, demo URL, social URL, and summary through the Build Small submission form.
 
 ## Submission Form Draft
 

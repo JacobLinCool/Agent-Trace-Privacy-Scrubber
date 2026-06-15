@@ -36,10 +36,9 @@ The small problem it solves is concrete: agent logs are useful, but they are mes
 - Demo video: https://youtu.be/Go2AcwcE72M
 - Demo video file: [docs/demo-agent-trace-privacy-scrubber.mp4](docs/demo-agent-trace-privacy-scrubber.mp4)
 - Article draft: [docs/article.md](docs/article.md)
+- Social post: https://x.com/JacobLinCool/status/2066455131189850204
 - Social post draft: [docs/social-post.md](docs/social-post.md)
 - Submission notes and quest checklist: [docs/submission-notes.md](docs/submission-notes.md)
-
-Live social-post URL is still pending because the draft should not be posted without human approval.
 
 ## Why We Built It
 
