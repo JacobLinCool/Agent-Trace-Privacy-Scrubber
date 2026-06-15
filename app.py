@@ -76,15 +76,19 @@ SOURCE_OPTIONS = [
 ]
 
 APP_CSS = """
-:root {
+:root,
+.gradio-container {
   --ats-bg: #f6f7f8;
   --ats-panel: #ffffff;
   --ats-panel-soft: #f9fafb;
+  --ats-input: #ffffff;
+  --ats-input-muted: #f3f4f6;
   --ats-border: #d9dee4;
   --ats-border-strong: #b9c2cd;
   --ats-text: #111827;
   --ats-muted: #5b6472;
   --ats-subtle: #7a8493;
+  --ats-inverted-text: #ffffff;
   --ats-accent: #0f766e;
   --ats-accent-strong: #115e59;
   --ats-warn: #a16207;
@@ -93,10 +97,59 @@ APP_CSS = """
   --ats-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
 }
 
+body.dark,
+body.dark .gradio-container,
+.dark .gradio-container {
+  --ats-bg: #181915;
+  --ats-panel: #23241f;
+  --ats-panel-soft: #2d2e28;
+  --ats-input: #1f201c;
+  --ats-input-muted: #171814;
+  --ats-border: #4a4c43;
+  --ats-border-strong: #686b5f;
+  --ats-text: #f4f1e8;
+  --ats-muted: #d2ccbd;
+  --ats-subtle: #aaa394;
+  --ats-inverted-text: #ffffff;
+  --ats-accent: #2dd4bf;
+  --ats-accent-strong: #99f6e4;
+  --ats-warn: #facc15;
+  --ats-error: #f87171;
+  --ats-success: #34d399;
+  --ats-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+  background: var(--ats-bg) !important;
+  color-scheme: dark;
+}
+
+body:not(.dark) .gradio-container,
+.gradio-container {
+  color-scheme: light;
+}
+
 .gradio-container {
   background: var(--ats-bg) !important;
   color: var(--ats-text) !important;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+.gradio-container,
+.gradio-container .app-shell,
+.gradio-container .workbench-grid,
+.gradio-container .footer-note {
+  background: var(--ats-bg) !important;
+}
+
+.gradio-container,
+.gradio-container h1,
+.gradio-container h2,
+.gradio-container h3,
+.gradio-container label,
+.gradio-container p,
+.gradio-container span,
+.gradio-container table,
+.gradio-container th,
+.gradio-container td {
+  color: var(--ats-text) !important;
 }
 
 .app-shell {
@@ -200,8 +253,22 @@ APP_CSS = """
   border: 1px solid var(--ats-border) !important;
   border-radius: 8px !important;
   background: var(--ats-panel) !important;
+  color: var(--ats-text) !important;
   box-shadow: var(--ats-shadow);
   padding: 14px !important;
+}
+
+.tool-panel,
+.tool-panel > *,
+.tool-panel .block,
+.tool-panel .form,
+.tool-panel .tabs,
+.tool-panel .tabitem,
+.tool-panel .tab-nav,
+.tool-panel [data-testid="block-info"] {
+  background-color: var(--ats-panel) !important;
+  border-color: var(--ats-border) !important;
+  color: var(--ats-text) !important;
 }
 
 .tool-panel + .tool-panel {
@@ -268,7 +335,7 @@ APP_CSS = """
 
 .metric {
   border: 1px solid var(--ats-border);
-  background: #fff;
+  background: var(--ats-input);
   border-radius: 7px;
   padding: 8px 9px;
 }
@@ -301,7 +368,7 @@ APP_CSS = """
   border: 1px solid var(--ats-border-strong);
   border-radius: 999px;
   color: var(--ats-accent-strong);
-  background: #fff;
+  background: var(--ats-input);
   padding: 3px 8px;
   font-size: 11px;
   font-weight: 700;
@@ -311,7 +378,7 @@ APP_CSS = """
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e8edf2;
+  background: var(--ats-input-muted);
   margin: 10px 0;
 }
 
@@ -325,11 +392,88 @@ APP_CSS = """
 .inline-warning {
   margin-top: 10px;
   border: 1px solid rgba(161, 98, 7, 0.35);
-  background: #fffbeb;
-  color: #713f12;
+  background: color-mix(in srgb, var(--ats-warn) 16%, var(--ats-panel));
+  color: var(--ats-text);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 13px;
+}
+
+.gradio-container button {
+  border-color: var(--ats-border) !important;
+}
+
+.gradio-container button.primary,
+.gradio-container button[class*="primary"] {
+  color: var(--ats-inverted-text) !important;
+}
+
+.gradio-container button.stop,
+.gradio-container button[class*="stop"] {
+  color: var(--ats-inverted-text) !important;
+}
+
+.gradio-container input:not([type="checkbox"]):not([type="radio"]),
+.gradio-container textarea,
+.gradio-container select,
+.gradio-container [role="textbox"],
+.gradio-container [role="combobox"],
+.gradio-container [role="listbox"] {
+  background: var(--ats-input) !important;
+  border-color: var(--ats-border) !important;
+  color: var(--ats-text) !important;
+}
+
+.gradio-container input::placeholder,
+.gradio-container textarea::placeholder {
+  color: var(--ats-subtle) !important;
+}
+
+.gradio-container input[type="checkbox"],
+.gradio-container input[type="radio"] {
+  accent-color: #f97316 !important;
+}
+
+.gradio-container .dataframe,
+.gradio-container .dataframe *,
+.gradio-container table {
+  border-color: var(--ats-border) !important;
+}
+
+.gradio-container table,
+.gradio-container tbody,
+.gradio-container tr,
+.gradio-container td {
+  background: var(--ats-panel) !important;
+}
+
+.gradio-container thead,
+.gradio-container th {
+  background: var(--ats-input-muted) !important;
+}
+
+.gradio-container .tab-nav,
+.gradio-container .tabitem,
+.gradio-container [role="tablist"] {
+  background: var(--ats-panel-soft) !important;
+}
+
+.gradio-container [role="tab"] {
+  color: var(--ats-muted) !important;
+}
+
+.gradio-container [role="tab"][aria-selected="true"] {
+  color: var(--ats-accent-strong) !important;
+  border-color: var(--ats-accent) !important;
+}
+
+.gradio-container .file-preview,
+.gradio-container .file-preview *,
+.gradio-container .file,
+.gradio-container .file * {
+  background: var(--ats-input) !important;
+  border-color: var(--ats-border) !important;
+  color: var(--ats-text) !important;
 }
 
 .compact-actions button {
