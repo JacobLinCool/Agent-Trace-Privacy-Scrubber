@@ -75,5 +75,5 @@ The result is intentionally small: one Gradio app, one clear privacy workflow, o
 
 - Live Space: https://huggingface.co/spaces/build-small-hackathon/agent-trace-privacy-scrubber
 - GitHub: https://github.com/JacobLinCool/Agent-Trace-Privacy-Scrubber
-- Demo video: `docs/demo-agent-trace-privacy-scrubber.mp4`
+- Demo video: https://youtu.be/Go2AcwcE72M
 - Submission notes: `docs/submission-notes.md`

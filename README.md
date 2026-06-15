@@ -33,6 +33,7 @@ The small problem it solves is concrete: agent logs are useful, but they are mes
 
 - Live Space: https://huggingface.co/spaces/build-small-hackathon/agent-trace-privacy-scrubber
 - GitHub repository: https://github.com/JacobLinCool/Agent-Trace-Privacy-Scrubber
+- Demo video: https://youtu.be/Go2AcwcE72M
 - Demo video file: [docs/demo-agent-trace-privacy-scrubber.mp4](docs/demo-agent-trace-privacy-scrubber.mp4)
 - Article draft: [docs/article.md](docs/article.md)
 - Social post draft: [docs/social-post.md](docs/social-post.md)

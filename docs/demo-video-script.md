@@ -1,6 +1,6 @@
 # Demo Video Script
 
-This is the script for the included short demo video at `docs/demo-agent-trace-privacy-scrubber.mp4`.
+This is the script for the uploaded YouTube demo at https://youtu.be/Go2AcwcE72M and the included repository copy at `docs/demo-agent-trace-privacy-scrubber.mp4`.
 
 1. Open Agent Trace Privacy Scrubber.
 2. Choose **Use sample logs** so no real private trace is uploaded.
