@@ -55,19 +55,27 @@ def guess_agent_type(path: str | Path) -> str:
         return "Codex"
     if ".claude/projects" in normalized or "claude" in normalized:
         return "Claude Code"
-    if ".pi/agent/sessions" in normalized or "/pi/" in normalized or "pi-agent" in normalized:
+    if (
+        ".pi/agent/sessions" in normalized
+        or "/pi/" in normalized
+        or "pi-agent" in normalized
+    ):
         return "Pi Agent"
     return "Unknown"
 
 
-def discover_known_source(source_name: str, max_file_size_warning_mb: int = 50) -> list[LogFile]:
+def discover_known_source(
+    source_name: str, max_file_size_warning_mb: int = 50
+) -> list[LogFile]:
     """Discover logs from one of the known local agent directories."""
 
     root = KNOWN_LOCAL_SOURCES[source_name]
     return discover_roots([root], max_file_size_warning_mb=max_file_size_warning_mb)
 
 
-def discover_custom_path(path: str, max_file_size_warning_mb: int = 50) -> list[LogFile]:
+def discover_custom_path(
+    path: str, max_file_size_warning_mb: int = 50
+) -> list[LogFile]:
     """Discover logs below a user-provided local filesystem path."""
 
     expanded = Path(path).expanduser()
@@ -115,7 +123,9 @@ def discover_roots(
     return sorted(discovered, key=lambda item: item.relative_path)
 
 
-def rows_for_table(logs: Sequence[LogFile | dict[str, object]], selected: bool = True) -> list[list[object]]:
+def rows_for_table(
+    logs: Sequence[LogFile | dict[str, object]], selected: bool = True
+) -> list[list[object]]:
     """Convert discovered logs into Gradio Dataframe rows."""
 
     rows: list[list[object]] = []

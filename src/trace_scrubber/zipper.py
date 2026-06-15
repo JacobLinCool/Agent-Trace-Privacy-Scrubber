@@ -15,7 +15,7 @@ from .reporting import DISCLAIMER, build_redaction_report
 
 TEMP_PREFIX = "trace-scrubber-"
 
-README_FIRST = f"""Local Agent Trace Privacy Scrubber
+README_FIRST = f"""Agent Trace Privacy Scrubber
 
 {DISCLAIMER}
 
@@ -75,6 +75,8 @@ def build_zip_archive(
             output_file = sanitized_root / report_item.output_relative_path
             if output_file.is_file():
                 archive.write(output_file, arcname=report_item.output_relative_path)
-        archive.write(package_root / "redaction_report.json", arcname="redaction_report.json")
+        archive.write(
+            package_root / "redaction_report.json", arcname="redaction_report.json"
+        )
         archive.write(package_root / "README_FIRST.txt", arcname="README_FIRST.txt")
     return zip_path

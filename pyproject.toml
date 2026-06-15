@@ -1,7 +1,7 @@
 [project]
 name = "agent-trace-privacy-scrubber"
 version = "0.1.0"
-description = "Local agent trace privacy scrubber"
+description = "Agent trace privacy scrubber"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [

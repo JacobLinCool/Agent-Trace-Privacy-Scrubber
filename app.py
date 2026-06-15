@@ -1,29 +1,14 @@
 from __future__ import annotations
 
+import spaces
 import html
 import sys
 import time
 from collections import Counter
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 
 import gradio as gr
-
-try:
-    import spaces
-except ImportError:  # pragma: no cover - local dev can run before dependencies install.
-    class _SpacesFallback:
-        @staticmethod
-        def GPU(*args, **kwargs):
-            if args and callable(args[0]) and len(args) == 1 and not kwargs:
-                return args[0]
-
-            def decorator(fn):
-                return fn
-
-            return decorator
-
-    spaces = _SpacesFallback()
 
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src"
@@ -42,7 +27,12 @@ from trace_scrubber.discovery import (
 )
 from trace_scrubber.jsonl_processor import FileProcessReport, process_jsonl_file_iter
 from trace_scrubber.modal_backend import ModalPIIRedactor
-from trace_scrubber.redactors import ModelRedactionError, OpenMedPIIRedactor, PIIRedactor, RedactionConfig
+from trace_scrubber.redactors import (
+    ModelRedactionError,
+    OpenMedPIIRedactor,
+    PIIRedactor,
+    RedactionConfig,
+)
 from trace_scrubber.reporting import report_preview_rows
 from trace_scrubber.zipper import build_zip_archive, make_output_workspace
 
@@ -394,14 +384,26 @@ def scan_logs(
             target = str(KNOWN_LOCAL_SOURCES[known_source])
         elif source_mode == "Custom local path":
             if not custom_path.strip():
-                return _status_panel_html("warning", "Path required", "Enter a local path before scanning."), [], []
+                return (
+                    _status_panel_html(
+                        "warning",
+                        "Path required",
+                        "Enter a local path before scanning.",
+                    ),
+                    [],
+                    [],
+                )
             logs = discover_custom_path(custom_path, max_file_size_warning_mb)
             target = custom_path
         elif source_mode == "Upload files":
-            logs = discover_uploaded_files(_normalize_file_inputs(uploaded_files), max_file_size_warning_mb)
+            logs = discover_uploaded_files(
+                _normalize_file_inputs(uploaded_files), max_file_size_warning_mb
+            )
             target = "uploaded files"
         elif source_mode == "Upload directory":
-            logs = discover_uploaded_files(_normalize_file_inputs(uploaded_directory), max_file_size_warning_mb)
+            logs = discover_uploaded_files(
+                _normalize_file_inputs(uploaded_directory), max_file_size_warning_mb
+            )
             target = "uploaded directory"
         else:
             sample_root = ROOT / "sample_logs"
@@ -411,12 +413,16 @@ def scan_logs(
         return _status_panel_html("error", "Scan failed", _safe_error(exc)), [], []
 
     if not logs:
-        return _status_panel_html(
-            "warning",
-            "No trace files found",
-            f"No JSONL, NDJSON, or JSON trace files were found in {_inline_code(target)}.",
-            detail_is_html=True,
-        ), [], []
+        return (
+            _status_panel_html(
+                "warning",
+                "No trace files found",
+                f"No JSONL, NDJSON, or JSON trace files were found in {_inline_code(target)}.",
+                detail_is_html=True,
+            ),
+            [],
+            [],
+        )
 
     rows = rows_for_table(logs, selected=True)
     state = [log.to_dict() for log in logs]
@@ -587,10 +593,23 @@ def _process_selected_logs_impl(
     selected = selected_relative_paths(table_data)
     selected_logs = [log for log in logs if str(log.get("relative_path")) in selected]
     if not selected_logs:
-        yield _status_panel_html("warning", "No files selected", "Select at least one trace file before processing."), None, [], ""
+        yield (
+            _status_panel_html(
+                "warning",
+                "No files selected",
+                "Select at least one trace file before processing.",
+            ),
+            None,
+            [],
+            "",
+        )
         return
 
-    if model_enabled and compute_backend == MODAL_CLOUD_BACKEND and model_name not in MODAL_MODEL_OPTIONS:
+    if (
+        model_enabled
+        and compute_backend == MODAL_CLOUD_BACKEND
+        and model_name not in MODAL_MODEL_OPTIONS
+    ):
         yield (
             _status_panel_html(
                 "warning",
@@ -648,7 +667,12 @@ def _process_selected_logs_impl(
             model_redactor.prepare_model(config)
         except ModelRedactionError as exc:
             model_redactor.release()
-            yield _status_panel_html("error", "Model unavailable", _safe_error(exc)), None, [], ""
+            yield (
+                _status_panel_html("error", "Model unavailable", _safe_error(exc)),
+                None,
+                [],
+                "",
+            )
             return
 
     processed_lines = 0
@@ -677,8 +701,13 @@ def _process_selected_logs_impl(
                     current_processed = processed_lines + event.progress.line_number
                     denominator = total_lines or total_bytes
                     fraction = current_processed / denominator if denominator else 0
-                    progress(min(fraction, 1.0), desc=f"{relative_path} line {event.progress.line_number}")
-                    regex_counts = aggregate_regex + event.progress.counts_by_regex_secret_rule
+                    progress(
+                        min(fraction, 1.0),
+                        desc=f"{relative_path} line {event.progress.line_number}",
+                    )
+                    regex_counts = (
+                        aggregate_regex + event.progress.counts_by_regex_secret_rule
+                    )
                     pii_counts = aggregate_pii + event.progress.counts_by_pii_label
                     yield (
                         _status_html(
@@ -708,7 +737,12 @@ def _process_selected_logs_impl(
                     processed_lines += event.report.lines_processed
         except ModelRedactionError as exc:
             model_redactor.release()
-            yield _status_panel_html("error", "Model redaction failed", _safe_error(exc)), None, report_preview_rows(file_reports), ""
+            yield (
+                _status_panel_html("error", "Model redaction failed", _safe_error(exc)),
+                None,
+                report_preview_rows(file_reports),
+                "",
+            )
             return
         except Exception as exc:
             error_report = FileProcessReport(
@@ -721,7 +755,16 @@ def _process_selected_logs_impl(
 
     if not file_reports:
         model_redactor.release()
-        yield _status_panel_html("warning", "No files processed", "The run ended before any report was created."), None, [], ""
+        yield (
+            _status_panel_html(
+                "warning",
+                "No files processed",
+                "The run ended before any report was created.",
+            ),
+            None,
+            [],
+            "",
+        )
         return
 
     zip_path = build_zip_archive(workspace, file_reports, config)
@@ -786,7 +829,7 @@ def _app_header_html() -> str:
       <div class="app-topbar">
         <div>
           <div class="eyebrow">Trace Privacy Workbench</div>
-          <h1 class="app-title">Local Agent Trace Privacy Scrubber</h1>
+          <h1 class="app-title">Agent Trace Privacy Scrubber</h1>
           <p class="app-subtitle">Inspect, redact, and package agent traces with explicit compute boundaries and auditable output reports.</p>
         </div>
         <div class="runtime-ledger" aria-label="Runtime boundaries">
@@ -832,10 +875,14 @@ def _status_panel_html(
     detail_html = detail if detail_is_html else _escape(detail)
     metrics_html = ""
     if metrics:
-        metrics_html = '<div class="metric-grid">' + "".join(
-            f'<div class="metric"><span>{_escape(label)}</span><strong>{_escape(value)}</strong></div>'
-            for label, value in metrics
-        ) + "</div>"
+        metrics_html = (
+            '<div class="metric-grid">'
+            + "".join(
+                f'<div class="metric"><span>{_escape(label)}</span><strong>{_escape(value)}</strong></div>'
+                for label, value in metrics
+            )
+            + "</div>"
+        )
     return (
         f'<div class="status-panel {_escape(tone)}">'
         f"<strong>{_escape(title)}</strong>"
@@ -859,7 +906,9 @@ def build_app() -> gr.Blocks:
             with gr.Column(scale=4, min_width=360):
                 with gr.Group(elem_classes=["tool-panel"]):
                     gr.HTML(_section_header_html("01", "Source"))
-                    source_mode = gr.Radio(SOURCE_OPTIONS, value="Known local source", label="Input source")
+                    source_mode = gr.Radio(
+                        SOURCE_OPTIONS, value="Known local source", label="Input source"
+                    )
                     known_source = gr.Dropdown(
                         list(KNOWN_LOCAL_SOURCES.keys()),
                         value="Codex",
@@ -886,7 +935,11 @@ def build_app() -> gr.Blocks:
                     )
                     scan_button = gr.Button("Scan logs", variant="primary", size="md")
                     scan_status = gr.HTML(
-                        _status_panel_html("neutral", "Ready to scan", "Select a source and scan for trace files.")
+                        _status_panel_html(
+                            "neutral",
+                            "Ready to scan",
+                            "Select a source and scan for trace files.",
+                        )
                     )
 
                 with gr.Group(elem_classes=["tool-panel"]):
@@ -896,21 +949,41 @@ def build_app() -> gr.Blocks:
                         value=CURRENT_RUNTIME_BACKEND,
                         label="Compute backend",
                     )
-                    model_name = gr.Dropdown(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Privacy filter model")
-                    mode = gr.Dropdown(["mask", "remove", "hash", "replace"], value="mask", label="Redaction mode")
+                    model_name = gr.Dropdown(
+                        MODEL_OPTIONS,
+                        value=MODEL_OPTIONS[0],
+                        label="Privacy filter model",
+                    )
+                    mode = gr.Dropdown(
+                        ["mask", "remove", "hash", "replace"],
+                        value="mask",
+                        label="Redaction mode",
+                    )
                     modal_warning = gr.HTML(value="", visible=False)
                     with gr.Row():
                         regex_enabled = gr.Checkbox(True, label="Secret regex")
                         model_enabled = gr.Checkbox(True, label="Model PII")
                     with gr.Row():
-                        preserve_json_structure = gr.Checkbox(True, label="Preserve JSON")
+                        preserve_json_structure = gr.Checkbox(
+                            True, label="Preserve JSON"
+                        )
                         include_report = gr.Checkbox(True, label="Detailed report")
                     with gr.Accordion("Advanced", open=False):
-                        chunk_size = gr.Slider(1000, 20000, value=6000, step=500, label="Chunk size")
-                        model_batch_size = gr.Slider(1, 128, value=32, step=1, label="Model batch size")
-                        max_file_size_warning_mb = gr.Slider(1, 500, value=50, step=1, label="Large file threshold (MB)")
-                        confidence_threshold = gr.Slider(0.0, 1.0, value=0.5, step=0.05, label="Confidence threshold")
-                        seed = gr.Number(value=2026, precision=0, label="Deterministic seed")
+                        chunk_size = gr.Slider(
+                            1000, 20000, value=6000, step=500, label="Chunk size"
+                        )
+                        model_batch_size = gr.Slider(
+                            1, 128, value=32, step=1, label="Model batch size"
+                        )
+                        max_file_size_warning_mb = gr.Slider(
+                            1, 500, value=50, step=1, label="Large file threshold (MB)"
+                        )
+                        confidence_threshold = gr.Slider(
+                            0.0, 1.0, value=0.5, step=0.05, label="Confidence threshold"
+                        )
+                        seed = gr.Number(
+                            value=2026, precision=0, label="Deterministic seed"
+                        )
 
             with gr.Column(scale=7, min_width=560):
                 with gr.Group(elem_classes=["tool-panel data-surface"]):
@@ -918,10 +991,20 @@ def build_app() -> gr.Blocks:
                     with gr.Row(elem_classes=["compact-actions"]):
                         select_all_button = gr.Button("Select all", size="sm")
                         select_none_button = gr.Button("Clear", size="sm")
-                        select_likely_button = gr.Button("Select JSONL/NDJSON", size="sm")
+                        select_likely_button = gr.Button(
+                            "Select JSONL/NDJSON", size="sm"
+                        )
                     logs_table = gr.Dataframe(
                         headers=TABLE_HEADERS,
-                        datatype=["bool", "str", "str", "str", "number", "number", "str"],
+                        datatype=[
+                            "bool",
+                            "str",
+                            "str",
+                            "str",
+                            "number",
+                            "number",
+                            "str",
+                        ],
                         type="array",
                         row_count=0,
                         interactive=True,
@@ -944,7 +1027,11 @@ def build_app() -> gr.Blocks:
                         )
                         cancel_button = gr.Button("Cancel", variant="stop", size="lg")
                     process_status = gr.HTML(
-                        _status_panel_html("neutral", "Waiting", "Scan and select trace files before processing.")
+                        _status_panel_html(
+                            "neutral",
+                            "Waiting",
+                            "Scan and select trace files before processing.",
+                        )
                     )
 
                 with gr.Group(elem_classes=["tool-panel data-surface"]):
@@ -955,7 +1042,16 @@ def build_app() -> gr.Blocks:
                         with gr.Tab("Report"):
                             report_table = gr.Dataframe(
                                 headers=REPORT_HEADERS,
-                                datatype=["str", "number", "number", "number", "number", "number", "number", "number"],
+                                datatype=[
+                                    "str",
+                                    "number",
+                                    "number",
+                                    "number",
+                                    "number",
+                                    "number",
+                                    "number",
+                                    "number",
+                                ],
                                 type="array",
                                 row_count=0,
                                 interactive=False,
@@ -1000,7 +1096,9 @@ def build_app() -> gr.Blocks:
         )
         select_all_button.click(select_all, inputs=[logs_table], outputs=[logs_table])
         select_none_button.click(select_none, inputs=[logs_table], outputs=[logs_table])
-        select_likely_button.click(select_likely_trace_files, inputs=[logs_table], outputs=[logs_table])
+        select_likely_button.click(
+            select_likely_trace_files, inputs=[logs_table], outputs=[logs_table]
+        )
 
         run_event = process_button.click(
             process_selected_logs,
@@ -1079,7 +1177,11 @@ def _status_html(
     if total_units and processed_units <= total_units:
         progress_percent = max(0, min(100, int(processed_units / total_units * 100)))
     tone = "success" if phase == "Complete" else "active"
-    line_metric = ("Line", f"{current_line}/{file_lines or 'unknown'}") if current_line is not None else None
+    line_metric = (
+        ("Line", f"{current_line}/{file_lines or 'unknown'}")
+        if current_line is not None
+        else None
+    )
     metrics = [
         ("File", f"{file_index}/{file_total}"),
         ("Progress", f"{processed_units}/{total_label} {unit_name}"),
@@ -1090,12 +1192,18 @@ def _status_html(
     ]
     if line_metric is not None:
         metrics.insert(2, line_metric)
-    metrics_html = '<div class="metric-grid">' + "".join(
-        f'<div class="metric"><span>{_escape(label)}</span><strong>{_escape(value)}</strong></div>'
-        for label, value in metrics
-    ) + "</div>"
+    metrics_html = (
+        '<div class="metric-grid">'
+        + "".join(
+            f'<div class="metric"><span>{_escape(label)}</span><strong>{_escape(value)}</strong></div>'
+            for label, value in metrics
+        )
+        + "</div>"
+    )
     if current_line is not None:
-        current_file_label = f"{current_file} · line {current_line}/{file_lines or 'unknown'}"
+        current_file_label = (
+            f"{current_file} · line {current_line}/{file_lines or 'unknown'}"
+        )
     else:
         current_file_label = current_file
     return (
@@ -1132,13 +1240,17 @@ def _format_duration(seconds: float) -> str:
     return f"{sec}s"
 
 
-def _preview_sanitized_output(sanitized_root: Path, reports: Iterable[FileProcessReport]) -> str:
+def _preview_sanitized_output(
+    sanitized_root: Path, reports: Iterable[FileProcessReport]
+) -> str:
     for report in reports:
         output_file = sanitized_root / report.output_relative_path
         if not output_file.is_file():
             continue
         try:
-            lines = output_file.read_text(encoding="utf-8", errors="replace").splitlines()[:8]
+            lines = output_file.read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines()[:8]
         except OSError:
             continue
         preview = "\n".join(lines)

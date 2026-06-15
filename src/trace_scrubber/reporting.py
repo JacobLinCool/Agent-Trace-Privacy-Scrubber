@@ -36,7 +36,9 @@ def aggregate_file_reports(reports: Iterable[FileProcessReport]) -> dict[str, ob
         "bytes_out": sum(report.bytes_out for report in report_list),
         "lines_processed": sum(report.lines_processed for report in report_list),
         "invalid_json_lines": sum(report.invalid_json_lines for report in report_list),
-        "duration_seconds": round(sum(report.duration_seconds for report in report_list), 3),
+        "duration_seconds": round(
+            sum(report.duration_seconds for report in report_list), 3
+        ),
         "errors": errors,
         "warnings": warnings,
         "counts_by_pii_label": dict(sorted(pii_counts.items())),
@@ -66,7 +68,9 @@ def build_redaction_report(
     }
 
 
-def report_preview_rows(file_reports: Iterable[FileProcessReport]) -> list[list[object]]:
+def report_preview_rows(
+    file_reports: Iterable[FileProcessReport],
+) -> list[list[object]]:
     """Small table for the Gradio report preview."""
 
     rows: list[list[object]] = []

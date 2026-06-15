@@ -1,11 +1,11 @@
 ---
-title: Local Agent Trace Privacy Scrubber
+title: Agent Trace Privacy Scrubber
 colorFrom: blue
 colorTo: green
 sdk: gradio
 sdk_version: 6.0.0
 app_file: app.py
-pinned: false
+pinned: true
 tags:
   - gradio
   - privacy
@@ -21,7 +21,7 @@ tags:
 # TODO: verify exact Build Small hackathon tag slugs against the latest field guide.
 ---
 
-# Local Agent Trace Privacy Scrubber
+# Agent Trace Privacy Scrubber
 
 A local-first Gradio app for sanitizing raw JSONL agent traces before uploading them to Hugging Face Datasets, Storage Buckets, or any public trace viewer.
 

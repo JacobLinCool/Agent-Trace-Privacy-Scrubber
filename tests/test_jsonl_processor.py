@@ -12,12 +12,14 @@ def test_invalid_jsonl_line_is_sanitized_as_raw_text(tmp_path: Path) -> None:
     output_file = tmp_path / "out" / "trace.jsonl"
     input_file.write_text(
         '{"ok": "sk-proj-FAKEFAKEFAKEFAKEFAKEFAKE"}\n'
-        'not json with hf_FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE\n',
+        "not json with hf_FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE\n",
         encoding="utf-8",
     )
     config = RedactionConfig(regex_enabled=True, model_enabled=False)
 
-    report = process_jsonl_file(input_file, output_file, "trace.jsonl", config, total_lines=2)
+    report = process_jsonl_file(
+        input_file, output_file, "trace.jsonl", config, total_lines=2
+    )
     output = output_file.read_text(encoding="utf-8")
 
     assert report.lines_processed == 2
@@ -43,7 +45,9 @@ def test_progress_can_emit_every_line_when_debounce_is_zero(tmp_path: Path) -> N
             progress_debounce_seconds=0,
         )
     )
-    progress_lines = [event.progress.line_number for event in events if event.progress is not None]
+    progress_lines = [
+        event.progress.line_number for event in events if event.progress is not None
+    ]
 
     assert progress_lines == [1, 2, 3]
 
@@ -64,7 +68,9 @@ def test_progress_debounce_still_emits_final_line(tmp_path: Path) -> None:
             progress_debounce_seconds=999,
         )
     )
-    progress_lines = [event.progress.line_number for event in events if event.progress is not None]
+    progress_lines = [
+        event.progress.line_number for event in events if event.progress is not None
+    ]
 
     assert progress_lines == [1, 3]
 
@@ -79,9 +85,14 @@ def test_model_redaction_batches_across_jsonl_lines(tmp_path: Path) -> None:
         def redact(self, text: str, config: RedactionConfig) -> TextRedactionResult:
             return self.redact_many([text], config)[0]
 
-        def redact_many(self, texts: list[str], config: RedactionConfig) -> list[TextRedactionResult]:
+        def redact_many(
+            self, texts: list[str], config: RedactionConfig
+        ) -> list[TextRedactionResult]:
             calls.append(texts)
-            return [TextRedactionResult(text=f"<PII:{index}>") for index, _ in enumerate(texts)]
+            return [
+                TextRedactionResult(text=f"<PII:{index}>")
+                for index, _ in enumerate(texts)
+            ]
 
         def release(self) -> None:
             pass

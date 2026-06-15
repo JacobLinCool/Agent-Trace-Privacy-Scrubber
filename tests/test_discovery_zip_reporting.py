@@ -10,7 +10,9 @@ from trace_scrubber.reporting import aggregate_file_reports
 from trace_scrubber.zipper import build_zip_archive
 
 
-def test_directory_discovery_finds_trace_files_and_guesses_agent(tmp_path: Path) -> None:
+def test_directory_discovery_finds_trace_files_and_guesses_agent(
+    tmp_path: Path,
+) -> None:
     root = tmp_path / ".codex" / "sessions"
     root.mkdir(parents=True)
     (root / "session.jsonl").write_text('{"message":"hello"}\n', encoding="utf-8")
@@ -35,7 +37,9 @@ def test_zip_output_preserves_relative_paths(tmp_path: Path) -> None:
         lines_processed=1,
     )
 
-    zip_path = build_zip_archive(workspace, [report], RedactionConfig(model_enabled=False))
+    zip_path = build_zip_archive(
+        workspace, [report], RedactionConfig(model_enabled=False)
+    )
 
     with ZipFile(zip_path) as archive:
         names = set(archive.namelist())

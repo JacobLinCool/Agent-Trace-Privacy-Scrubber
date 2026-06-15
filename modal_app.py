@@ -20,7 +20,9 @@ MODEL_CACHE_PATH = "/cache"
 SRC_PATH = "/root/src"
 
 app = modal.App(APP_NAME)
-model_cache = modal.Volume.from_name("agent-trace-privacy-scrubber-model-cache", create_if_missing=True)
+model_cache = modal.Volume.from_name(
+    "agent-trace-privacy-scrubber-model-cache", create_if_missing=True
+)
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
@@ -50,7 +52,9 @@ _cache_committed = False
     },
     name=FUNCTION_NAME,
 )
-def redact_text_batch(texts: list[str], settings: dict[str, object]) -> list[dict[str, object]]:
+def redact_text_batch(
+    texts: list[str], settings: dict[str, object]
+) -> list[dict[str, object]]:
     """Run model-only OpenMed redaction on Modal CUDA hardware."""
 
     if SRC_PATH not in sys.path:
@@ -71,7 +75,9 @@ def redact_text_batch(texts: list[str], settings: dict[str, object]) -> list[dic
         seed=int(settings["seed"]),
     )
     if config.model_name != "OpenMed/privacy-filter-nemotron":
-        raise ValueError("Modal cloud GPU backend supports OpenMed/privacy-filter-nemotron only.")
+        raise ValueError(
+            "Modal cloud GPU backend supports OpenMed/privacy-filter-nemotron only."
+        )
 
     redactor = _get_redactor(OpenMedPIIRedactor, config)
     responses: list[dict[str, object]] = []

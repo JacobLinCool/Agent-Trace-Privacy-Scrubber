@@ -50,7 +50,9 @@ class PIIRedactor(Protocol):
         """Redact PII spans from one text value."""
         ...
 
-    def redact_many(self, texts: list[str], config: RedactionConfig) -> list[TextRedactionResult]:
+    def redact_many(
+        self, texts: list[str], config: RedactionConfig
+    ) -> list[TextRedactionResult]:
         """Redact PII spans from multiple text values in one model batch."""
         ...
 
@@ -104,7 +106,9 @@ SECRET_RULES: tuple[SecretRule, ...] = (
     SecretRule("slack_token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
     SecretRule(
         "jwt",
-        re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"),
+        re.compile(
+            r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"
+        ),
     ),
     SecretRule("aws_access_key_id", re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")),
     SecretRule(
@@ -271,7 +275,9 @@ class OpenMedPIIRedactor:
     def redact(self, text: str, config: RedactionConfig) -> TextRedactionResult:
         return self.redact_many([text], config)[0]
 
-    def redact_many(self, texts: list[str], config: RedactionConfig) -> list[TextRedactionResult]:
+    def redact_many(
+        self, texts: list[str], config: RedactionConfig
+    ) -> list[TextRedactionResult]:
         if not texts:
             return []
 
@@ -285,7 +291,9 @@ class OpenMedPIIRedactor:
         populated_texts = [texts[index] for index in populated_indexes]
         spans_by_text = self._extract_spans_many(populated_texts, config)
         for result_index, spans in zip(populated_indexes, spans_by_text):
-            results[result_index] = self._redact_with_spans(texts[result_index], spans, config)
+            results[result_index] = self._redact_with_spans(
+                texts[result_index], spans, config
+            )
         return results
 
     def _redact_with_spans(
@@ -307,7 +315,9 @@ class OpenMedPIIRedactor:
     def _extract_spans(self, text: str, config: RedactionConfig) -> list[EntitySpan]:
         return self._extract_spans_many([text], config)[0]
 
-    def _extract_spans_many(self, texts: list[str], config: RedactionConfig) -> list[list[EntitySpan]]:
+    def _extract_spans_many(
+        self, texts: list[str], config: RedactionConfig
+    ) -> list[list[EntitySpan]]:
         chunk_size = max(1000, int(config.chunk_size))
         chunk_refs: list[_ChunkRef] = []
         for text_index, text in enumerate(texts):
@@ -319,7 +329,9 @@ class OpenMedPIIRedactor:
             start = 0
             while start < len(text):
                 end = _chunk_boundary(text, start, chunk_size)
-                chunk_refs.append(_ChunkRef(text_index=text_index, text=text[start:end], offset=start))
+                chunk_refs.append(
+                    _ChunkRef(text_index=text_index, text=text[start:end], offset=start)
+                )
                 if end >= len(text):
                     break
                 start = max(end - overlap, start + 1)
@@ -331,7 +343,9 @@ class OpenMedPIIRedactor:
         spans_by_text: list[list[EntitySpan]] = [[] for _ in texts]
         for chunk_ref, result in zip(chunk_refs, results):
             spans_by_text[chunk_ref.text_index].extend(
-                self._entity_spans_from_result(result, chunk_ref.text, chunk_ref.offset, config)
+                self._entity_spans_from_result(
+                    result, chunk_ref.text, chunk_ref.offset, config
+                )
             )
         return [_dedupe_overlapping_spans(spans) for spans in spans_by_text]
 
@@ -342,13 +356,17 @@ class OpenMedPIIRedactor:
         config: RedactionConfig,
     ) -> list[EntitySpan]:
         return self._entity_spans_from_result(
-            self._extract_chunk_results([_ChunkRef(text_index=0, text=chunk, offset=offset)], config)[0],
+            self._extract_chunk_results(
+                [_ChunkRef(text_index=0, text=chunk, offset=offset)], config
+            )[0],
             chunk,
             offset,
             config,
         )
 
-    def _extract_chunk_results(self, chunk_refs: list[_ChunkRef], config: RedactionConfig) -> list[Any]:
+    def _extract_chunk_results(
+        self, chunk_refs: list[_ChunkRef], config: RedactionConfig
+    ) -> list[Any]:
         assert self._extract_pii is not None
         try:
             if self._uses_privacy_filter_model(config.model_name):
@@ -357,7 +375,9 @@ class OpenMedPIIRedactor:
                     [chunk_ref.text for chunk_ref in chunk_refs],
                     model_name=config.model_name,
                     confidence_threshold=config.confidence_threshold,
-                    privacy_filter_pipeline=self._get_privacy_filter_pipeline(config.model_name),
+                    privacy_filter_pipeline=self._get_privacy_filter_pipeline(
+                        config.model_name
+                    ),
                     batch_size=max(1, int(config.model_batch_size)),
                 )
             else:
@@ -400,7 +420,14 @@ class OpenMedPIIRedactor:
             if confidence < config.confidence_threshold:
                 continue
             label = _normalize_label(str(getattr(entity, "label", "pii")))
-            spans.append(EntitySpan(label=label, start=offset + start, end=offset + end, confidence=confidence))
+            spans.append(
+                EntitySpan(
+                    label=label,
+                    start=offset + start,
+                    end=offset + end,
+                    confidence=confidence,
+                )
+            )
         return spans
 
     def _replacement(self, label: str, value: str, config: RedactionConfig) -> str:
@@ -418,7 +445,9 @@ class OpenMedPIIRedactor:
             try:
                 return str(self._anonymizer.surrogate(value, label))
             except Exception as exc:  # pragma: no cover - optional faker path
-                raise ModelRedactionError("OpenMed replacement redaction failed.") from exc
+                raise ModelRedactionError(
+                    "OpenMed replacement redaction failed."
+                ) from exc
         return f"<REDACTED:{label}>"
 
     def _uses_privacy_filter_model(self, model_name: str) -> bool:
@@ -448,7 +477,10 @@ class OpenMedPIIRedactor:
         if backend == "mlx":
             return self._create_privacy_filter_pipeline(model_name)
 
-        if self._privacy_model_resolver is None or self._torch_privacy_filter_pipeline_cls is None:
+        if (
+            self._privacy_model_resolver is None
+            or self._torch_privacy_filter_pipeline_cls is None
+        ):
             self.ensure_available()
         assert self._privacy_model_resolver is not None
         assert self._torch_privacy_filter_pipeline_cls is not None
@@ -477,7 +509,9 @@ class OpenMedPIIRedactor:
 
         backends = getattr(torch, "backends", None)
         mps_backend = getattr(backends, "mps", None) if backends is not None else None
-        if mps_backend is not None and callable(getattr(mps_backend, "is_available", None)):
+        if mps_backend is not None and callable(
+            getattr(mps_backend, "is_available", None)
+        ):
             try:
                 if mps_backend.is_available():
                     return "mps"
@@ -562,7 +596,9 @@ def sanitize_texts(
         model = model_redactor or OpenMedPIIRedactor()
         pii_results = model.redact_many([result.text for result in results], config)
         if len(pii_results) != len(results):
-            raise ModelRedactionError("Model redaction returned an unexpected batch length.")
+            raise ModelRedactionError(
+                "Model redaction returned an unexpected batch length."
+            )
         for result, pii_result in zip(results, pii_results):
             result.text = pii_result.text
             result.pii_counts.update(pii_result.pii_counts)
@@ -618,7 +654,9 @@ def _dedupe_overlapping_spans(spans: list[EntitySpan]) -> list[EntitySpan]:
         return []
 
     selected: list[EntitySpan] = []
-    for span in sorted(spans, key=lambda item: (item.start, -(item.end - item.start), -item.confidence)):
+    for span in sorted(
+        spans, key=lambda item: (item.start, -(item.end - item.start), -item.confidence)
+    ):
         if not selected:
             selected.append(span)
             continue

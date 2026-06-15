@@ -44,7 +44,9 @@ class FileProcessReport:
             "warnings": list(self.warnings),
             "duration_seconds": round(self.duration_seconds, 3),
             "counts_by_pii_label": dict(sorted(self.counts_by_pii_label.items())),
-            "counts_by_regex_secret_rule": dict(sorted(self.counts_by_regex_secret_rule.items())),
+            "counts_by_regex_secret_rule": dict(
+                sorted(self.counts_by_regex_secret_rule.items())
+            ),
         }
 
 
@@ -112,7 +114,9 @@ def sanitize_json_values(
     sanitized_results: list[tuple[object, TextRedactionResult]] = []
     for template, refs in zip(templates, refs_by_value):
         sanitized = _materialize_string_refs(template, redactions)
-        aggregate = TextRedactionResult(text=sanitized if isinstance(sanitized, str) else "")
+        aggregate = TextRedactionResult(
+            text=sanitized if isinstance(sanitized, str) else ""
+        )
         for ref in refs:
             aggregate.regex_counts.update(redactions[ref].regex_counts)
             aggregate.pii_counts.update(redactions[ref].pii_counts)
@@ -131,18 +135,26 @@ def _collect_string_refs(value: object, strings: list[str], refs: list[int]) -> 
         return [_collect_string_refs(item, strings, refs) for item in value]
 
     if isinstance(value, dict):
-        return {key: _collect_string_refs(item, strings, refs) for key, item in value.items()}
+        return {
+            key: _collect_string_refs(item, strings, refs)
+            for key, item in value.items()
+        }
 
     return value
 
 
-def _materialize_string_refs(template: object, redactions: list[TextRedactionResult]) -> object:
+def _materialize_string_refs(
+    template: object, redactions: list[TextRedactionResult]
+) -> object:
     if isinstance(template, _StringRef):
         return redactions[template.index].text
     if isinstance(template, list):
         return [_materialize_string_refs(item, redactions) for item in template]
     if isinstance(template, dict):
-        return {key: _materialize_string_refs(item, redactions) for key, item in template.items()}
+        return {
+            key: _materialize_string_refs(item, redactions)
+            for key, item in template.items()
+        }
     return template
 
 
@@ -197,14 +209,19 @@ def process_jsonl_file_iter(
     progress_state = _ProgressState()
     line_batch_size = _line_batch_size(model, config)
 
-    with input_file.open("r", encoding="utf-8", errors="replace") as reader, output_file.open(
-        "w",
-        encoding="utf-8",
-        newline="\n",
-    ) as writer:
+    with (
+        input_file.open("r", encoding="utf-8", errors="replace") as reader,
+        output_file.open(
+            "w",
+            encoding="utf-8",
+            newline="\n",
+        ) as writer,
+    ):
         line_batch: list[_InputLine] = []
         for line_number, line in enumerate(reader, start=1):
-            line_batch.append(_InputLine(line_number=line_number, text=line.rstrip("\r\n")))
+            line_batch.append(
+                _InputLine(line_number=line_number, text=line.rstrip("\r\n"))
+            )
             if len(line_batch) >= line_batch_size:
                 yield from _process_line_batch(
                     line_batch,
@@ -236,7 +253,10 @@ def process_jsonl_file_iter(
 
     report.bytes_out = output_file.stat().st_size
     report.duration_seconds = time.monotonic() - start_time
-    if report.lines_processed and progress_state.last_progress_line != report.lines_processed:
+    if (
+        report.lines_processed
+        and progress_state.last_progress_line != report.lines_processed
+    ):
         yield ProcessEvent(
             kind="progress",
             progress=_build_progress(relative_path, total_lines, report),
@@ -263,7 +283,9 @@ def _process_line_batch(
     progress_debounce_seconds: float,
     progress_state: _ProgressState,
 ) -> Iterator[ProcessEvent]:
-    results = _sanitize_jsonl_lines([line.text for line in line_batch], config, model_redactor)
+    results = _sanitize_jsonl_lines(
+        [line.text for line in line_batch], config, model_redactor
+    )
     for input_line, result in zip(line_batch, results):
         if result.invalid_json:
             report.invalid_json_lines += 1
@@ -277,12 +299,9 @@ def _process_line_batch(
         report.counts_by_pii_label.update(result.redaction.pii_counts)
 
         now = time.monotonic()
-        should_emit = (
-            input_line.line_number == 1
-            or (
-                input_line.line_number % max(1, progress_interval) == 0
-                and now - progress_state.last_progress_at >= progress_debounce_seconds
-            )
+        should_emit = input_line.line_number == 1 or (
+            input_line.line_number % max(1, progress_interval) == 0
+            and now - progress_state.last_progress_at >= progress_debounce_seconds
         )
         if should_emit:
             progress_state.last_progress_at = now
@@ -353,7 +372,9 @@ def _sanitize_jsonl_lines(
         output_as_json.append(True)
         invalid_json.append(False)
 
-    sanitized_values = sanitize_json_values(values, config, model_redactor=model_redactor)
+    sanitized_values = sanitize_json_values(
+        values, config, model_redactor=model_redactor
+    )
     line_results: list[_LineResult] = []
     for (sanitized, redaction), should_dump_json, is_invalid in zip(
         sanitized_values,
@@ -361,14 +382,27 @@ def _sanitize_jsonl_lines(
         invalid_json,
     ):
         if should_dump_json:
-            output_line = json.dumps(sanitized, ensure_ascii=False, separators=(",", ":"))
+            output_line = json.dumps(
+                sanitized, ensure_ascii=False, separators=(",", ":")
+            )
         else:
-            output_line = sanitized if isinstance(sanitized, str) else json.dumps(sanitized, ensure_ascii=False)
-        line_results.append(_LineResult(output_line=output_line, redaction=redaction, invalid_json=is_invalid))
+            output_line = (
+                sanitized
+                if isinstance(sanitized, str)
+                else json.dumps(sanitized, ensure_ascii=False)
+            )
+        line_results.append(
+            _LineResult(
+                output_line=output_line, redaction=redaction, invalid_json=is_invalid
+            )
+        )
     return line_results
+
 
 def _append_invalid_json_warning(report: FileProcessReport, line_number: int) -> None:
     if len(report.warnings) < 100:
-        report.warnings.append(f"Line {line_number} is invalid JSON; sanitized as raw text.")
+        report.warnings.append(
+            f"Line {line_number} is invalid JSON; sanitized as raw text."
+        )
     elif len(report.warnings) == 100:
         report.warnings.append("Additional invalid JSON line warnings omitted.")

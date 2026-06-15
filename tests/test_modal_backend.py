@@ -10,7 +10,9 @@ def test_modal_redactor_calls_deployed_batch_function() -> None:
     calls: list[tuple[list[str], dict[str, object]]] = []
 
     class FakeFunction:
-        def remote(self, texts: list[str], settings: dict[str, object]) -> list[dict[str, Any]]:
+        def remote(
+            self, texts: list[str], settings: dict[str, object]
+        ) -> list[dict[str, Any]]:
             calls.append((texts, settings))
             return [{"text": "hello <REDACTED:email>", "pii_counts": {"email": 1}}]
 
@@ -51,15 +53,26 @@ def test_modal_redactor_batches_multiple_texts() -> None:
     calls: list[list[str]] = []
 
     class FakeFunction:
-        def remote(self, texts: list[str], settings: dict[str, object]) -> list[dict[str, Any]]:
+        def remote(
+            self, texts: list[str], settings: dict[str, object]
+        ) -> list[dict[str, Any]]:
             calls.append(texts)
-            return [{"text": f"{text} redacted", "pii_counts": {"name": 1}} for text in texts]
+            return [
+                {"text": f"{text} redacted", "pii_counts": {"name": 1}}
+                for text in texts
+            ]
 
-    redactor = ModalPIIRedactor(batch_size=2, function_lookup=lambda app_name, function_name: FakeFunction())
+    redactor = ModalPIIRedactor(
+        batch_size=2, function_lookup=lambda app_name, function_name: FakeFunction()
+    )
     config = RedactionConfig(model_name="OpenMed/privacy-filter-nemotron")
 
     results = redactor.redact_many(["one", "two", "three"], config)
 
-    assert [result.text for result in results] == ["one redacted", "two redacted", "three redacted"]
+    assert [result.text for result in results] == [
+        "one redacted",
+        "two redacted",
+        "three redacted",
+    ]
     assert [result.pii_counts["name"] for result in results] == [1, 1, 1]
     assert calls == [["one", "two"], ["three"]]

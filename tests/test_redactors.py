@@ -5,7 +5,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from trace_scrubber.jsonl_processor import sanitize_json_value
-from trace_scrubber.redactors import OpenMedPIIRedactor, RedactionConfig, SecretRegexRedactor
+from trace_scrubber.redactors import (
+    OpenMedPIIRedactor,
+    RedactionConfig,
+    SecretRegexRedactor,
+)
 
 
 def test_regex_redacts_common_secrets() -> None:
@@ -113,7 +117,9 @@ def test_non_mlx_privacy_filter_prefers_selected_torch_device() -> None:
     created: list[dict[str, Any]] = []
 
     class FakeTorchPrivacyFilterPipeline:
-        def __init__(self, model_name: str, *, device: str, trust_remote_code: bool) -> None:
+        def __init__(
+            self, model_name: str, *, device: str, trust_remote_code: bool
+        ) -> None:
             created.append(
                 {
                     "model_name": model_name,

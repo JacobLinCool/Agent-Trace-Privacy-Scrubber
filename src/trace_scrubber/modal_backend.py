@@ -48,7 +48,9 @@ class ModalPIIRedactor:
     def redact(self, text: str, config: RedactionConfig) -> TextRedactionResult:
         return self.redact_many([text], config)[0]
 
-    def redact_many(self, texts: list[str], config: RedactionConfig) -> list[TextRedactionResult]:
+    def redact_many(
+        self, texts: list[str], config: RedactionConfig
+    ) -> list[TextRedactionResult]:
         if not texts:
             return []
         self.prepare_model(config)
@@ -95,17 +97,23 @@ def _modal_settings(config: RedactionConfig) -> dict[str, object]:
     }
 
 
-def _coerce_modal_results(payload: object, *, expected_count: int) -> list[TextRedactionResult]:
+def _coerce_modal_results(
+    payload: object, *, expected_count: int
+) -> list[TextRedactionResult]:
     if not isinstance(payload, list) or len(payload) != expected_count:
         raise ModelRedactionError("Modal cloud redaction returned an invalid response.")
 
     results: list[TextRedactionResult] = []
     for item in payload:
         if not isinstance(item, dict):
-            raise ModelRedactionError("Modal cloud redaction returned an invalid response item.")
+            raise ModelRedactionError(
+                "Modal cloud redaction returned an invalid response item."
+            )
         text = item.get("text")
         if not isinstance(text, str):
-            raise ModelRedactionError("Modal cloud redaction returned a response without text.")
+            raise ModelRedactionError(
+                "Modal cloud redaction returned a response without text."
+            )
         results.append(
             TextRedactionResult(
                 text=text,
@@ -135,4 +143,6 @@ def _coerce_count_mapping(value: object) -> dict[str, int]:
 
 
 def _batched(items: list[str], batch_size: int) -> list[list[str]]:
-    return [items[index : index + batch_size] for index in range(0, len(items), batch_size)]
+    return [
+        items[index : index + batch_size] for index in range(0, len(items), batch_size)
+    ]
